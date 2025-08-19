@@ -1,0 +1,27 @@
+GLFW_ICON ICON "war_of_progress.ico"
+
+1 VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+	//BLOCK "080904E4" 	// English UK
+    BLOCK "040904E4"	// English US
+    BEGIN
+	  VALUE "CompanyName", "jackcat13"
+      VALUE "FileDescription", "War of progress | Roguelike inspired by AOE2"
+      VALUE "FileVersion", "1.0"
+      VALUE "InternalName", "war_of_progress"
+      VALUE "LegalCopyright", "(c) 2024 jackcat13"
+      //VALUE "OriginalFilename", "war_of_progress.exe"
+      VALUE "War of progress", "War of progress"
+      VALUE "ProductVersion", "1.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+	//VALUE "Translation", 0x809, 1252	// English UK
+    VALUE "Translation", 0x409, 1252	// English US
+  END
+END
