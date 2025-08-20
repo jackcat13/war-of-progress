@@ -18,6 +18,8 @@ static void CheckMouseScroll(void);
 static void CheckMouseZoom(void);
 static float ToXIso(int, int, int, int);
 static float ToYIso(int, int, int, int);
+static float ToXInvertedIso(int, int, int, int);
+static float ToYInvertedIso(int, int, int, int);
 static void InitMap(void);
 
 enum Scene { MENU, MAIN_GAME };
@@ -87,17 +89,33 @@ static void RenderMainGame(void) {
   BeginMode2D(camera);
 
   ClearBackground(BACKGROUND);
-  int i;
-  int j;
+  int i, j;
   int width = grassTexture.width;
   int height = grassTexture.height;
-  for (i = 0; i < mapSize.x; i++) {
-    for (j = 0; j < mapSize.y; j++) {
+  int iMin =
+      ToXInvertedIso(camera.target.x, camera.target.y, width, height) - 50;
+  int jMin =
+      ToYInvertedIso(camera.target.x, camera.target.y, width, height) - 50;
+  int iMax = iMin + 100;
+  int jMax = jMin + 100;
+  if (iMin < 0) {
+    iMin = 0;
+  }
+  if (jMin < 0) {
+    jMin = 0;
+  }
+  if (jMax > mapSize.y) {
+    jMax = mapSize.y;
+  }
+  if (iMax > mapSize.x) {
+    iMax = mapSize.x;
+  }
+  for (j = jMin; j < jMax; j++) {
+    for (i = iMin; i < iMax; i++) {
       float x = ToXIso(i, j, width, height);
       float y = ToYIso(i, j, width, height);
       Texture2D texture = TileToTexture(map[i][j]);
-      DrawTexture(texture, ToXIso(i, j, width, height),
-                  ToYIso(i, j, width, height), WHITE);
+      DrawTexture(texture, x, y, WHITE);
     }
   }
 
@@ -116,7 +134,7 @@ static void InitCamera(void) {
   float map_center_y = ToYIso(mapSize.x / 2, mapSize.y / 2, grassTexture.width,
                               grassTexture.height);
   camera.target = (Vector2){map_center_x, map_center_y};
-  camera.offset = (Vector2){screenWidth / 2.0f, 0.0f};
+  camera.offset = (Vector2){screenWidth / 2.0f, screenHeight / 2.0f};
   camera.rotation = 0.0f;
   camera.zoom = 0.3f;
 }
@@ -156,6 +174,14 @@ static float ToYIso(int x, int y, int width, int height) {
   return (float)(x + y) * height / 2;
 }
 
+static float ToXInvertedIso(int iso_x, int iso_y, int width, int height) {
+  return (float)((iso_x / (width / 2)) + (iso_y / (height / 2))) / 2;
+}
+
+static float ToYInvertedIso(int iso_x, int iso_y, int width, int height) {
+  return (float)((iso_y / (height / 2)) - (iso_x / (width / 2))) / 2;
+}
+
 // Mouse interactions
 
 const int SCROLL_MOVE = 80;
@@ -178,7 +204,7 @@ static void CheckMouseScroll(void) {
 
 static void CheckMouseZoom(void) {
   float wheelDelta = GetMouseWheelMove() / 10;
-  if (camera.zoom - wheelDelta > 0.0f && camera.zoom - wheelDelta < 3.0f) {
+  if (camera.zoom - wheelDelta > 0.1f && camera.zoom - wheelDelta < 3.0f) {
     camera.zoom -= wheelDelta;
   }
 }
