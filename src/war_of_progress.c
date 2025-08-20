@@ -15,14 +15,21 @@ static void RenderMenu(void);
 static void RenderMainGame(void);
 static void InitCamera(void);
 static void CheckMouseScroll(void);
+static void CheckMouseZoom(void);
 static float ToXIso(int, int, int, int);
 static float ToYIso(int, int, int, int);
+static void InitMap(void);
 
 enum Scene { MENU, MAIN_GAME };
 enum Scene current_scene = MENU;
+enum Tile { GRASS };
+
+static Texture2D TileToTexture(enum Tile);
 
 Camera2D camera = {0};
 Texture2D grassTexture;
+Vector2 mapSize = {200, 200};
+enum Tile **map;
 
 int main() {
   InitWindow(0, 0, "War of progress");
@@ -52,6 +59,7 @@ static void UpdateDrawFrame(void) {
     break;
   case MAIN_GAME:
     CheckMouseScroll();
+    CheckMouseZoom();
     RenderMainGame();
     break;
   }
@@ -65,6 +73,7 @@ static void RenderMenu(void) {
   ClearBackground(BLACK);
   if (GuiButton((Rectangle){24, 24, 120, 30}, "Start game")) {
     InitCamera();
+    InitMap();
     current_scene = MAIN_GAME;
   }
 }
@@ -83,13 +92,13 @@ static void RenderMainGame(void) {
   int j;
   int width = grassTexture.width;
   int height = grassTexture.height;
-  for (i = 1; i < 10; i++) {
-    for (j = 1; j < 10; j++) {
+  for (i = 0; i < mapSize.x; i++) {
+    for (j = 0; j < mapSize.y; j++) {
       float x = ToXIso(i, j, width, height);
       float y = ToYIso(i, j, width, height);
-      DrawTexture(grassTexture, ToXIso(i, j, width, height),
+      Texture2D texture = TileToTexture(map[i][j]);
+      DrawTexture(texture, ToXIso(i, j, width, height),
                   ToYIso(i, j, width, height), WHITE);
-      printf("%f, %f\n", x, y);
     }
   }
 
@@ -103,14 +112,39 @@ static void RenderMainGame(void) {
 static void InitCamera(void) {
   float screenWidth = GetScreenWidth();
   float screenHeight = GetScreenHeight();
-  camera.target = (Vector2){0.0f, 0.0f};
-  camera.offset = (Vector2){ screenWidth/2.0f, 0.0f };
+  float map_center_x = ToXIso(mapSize.x / 2, mapSize.y / 2, grassTexture.width,
+                              grassTexture.height);
+  float map_center_y = ToYIso(mapSize.x / 2, mapSize.y / 2, grassTexture.width,
+                              grassTexture.height);
+  camera.target = (Vector2){map_center_x, map_center_y};
+  camera.offset = (Vector2){screenWidth / 2.0f, 0.0f};
   camera.rotation = 0.0f;
   camera.zoom = 0.3f;
 }
 
 static void InitTextures(void) {
   grassTexture = LoadTexture("assets/map/grass.png");
+}
+
+static void InitMap(void) {
+  int i, j;
+  map = (enum Tile **)malloc(mapSize.y * sizeof(enum Tile *));
+  for (i = 0; i < mapSize.y; i++) {
+    map[i] = (enum Tile *)malloc(mapSize.x * sizeof(enum Tile));
+  }
+  for (i = 0; i < mapSize.y; i++) {
+    for (j = 0; j < mapSize.x; j++) {
+      map[i][j] = GRASS;
+    }
+  }
+}
+
+static Texture2D TileToTexture(enum Tile tile) {
+  switch (tile) {
+  case GRASS:
+    return grassTexture;
+    break;
+  }
 }
 
 // ISOMETRIC HELPERS
@@ -133,14 +167,19 @@ static void CheckMouseScroll(void) {
   Vector2 mouse_position = GetMousePosition();
   if (mouse_position.x >= screen_width) {
     camera.target.x += SCROLL_MOVE;
-  }
-  else if (mouse_position.x <= 0) {
+  } else if (mouse_position.x <= 0) {
     camera.target.x -= SCROLL_MOVE;
   }
   if (mouse_position.y >= screen_height) {
     camera.target.y += SCROLL_MOVE;
-  }
-  else if (mouse_position.y <= 0) {
+  } else if (mouse_position.y <= 0) {
     camera.target.y -= SCROLL_MOVE;
+  }
+}
+
+static void CheckMouseZoom(void) {
+  float wheelDelta = GetMouseWheelMove() / 10;
+  if (camera.zoom - wheelDelta > 0.0f && camera.zoom - wheelDelta < 3.0f) {
+    camera.zoom -= wheelDelta;
   }
 }
