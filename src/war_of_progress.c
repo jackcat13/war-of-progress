@@ -14,6 +14,7 @@ static void UpdateDrawFrame(void);
 static void RenderMenu(void);
 static void RenderMainGame(void);
 static void InitCamera(void);
+static void CheckMouseScroll(void);
 static float ToXIso(int, int, int, int);
 static float ToYIso(int, int, int, int);
 
@@ -50,6 +51,7 @@ static void UpdateDrawFrame(void) {
     RenderMenu();
     break;
   case MAIN_GAME:
+    CheckMouseScroll();
     RenderMainGame();
     break;
   }
@@ -119,4 +121,26 @@ static float ToXIso(int x, int y, int width, int height) {
 
 static float ToYIso(int x, int y, int width, int height) {
   return (float)(x + y) * height / 2;
+}
+
+// Mouse interactions
+
+const int SCROLL_MOVE = 80;
+
+static void CheckMouseScroll(void) {
+  int screen_width = GetScreenWidth();
+  int screen_height = GetScreenHeight();
+  Vector2 mouse_position = GetMousePosition();
+  if (mouse_position.x >= screen_width) {
+    camera.target.x += SCROLL_MOVE;
+  }
+  else if (mouse_position.x <= 0) {
+    camera.target.x -= SCROLL_MOVE;
+  }
+  if (mouse_position.y >= screen_height) {
+    camera.target.y += SCROLL_MOVE;
+  }
+  else if (mouse_position.y <= 0) {
+    camera.target.y -= SCROLL_MOVE;
+  }
 }
