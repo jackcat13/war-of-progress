@@ -33,7 +33,6 @@ enum Tile **map;
 
 int main() {
   InitWindow(0, 0, "War of progress");
-  ToggleFullscreen();
   GuiLoadStyleDefault();
   InitTextures();
 
@@ -165,14 +164,14 @@ static void CheckMouseScroll(void) {
   int screen_width = GetScreenWidth();
   int screen_height = GetScreenHeight();
   Vector2 mouse_position = GetMousePosition();
-  if (mouse_position.x >= screen_width) {
+  if (mouse_position.x >= screen_width - MARGIN) {
     camera.target.x += SCROLL_MOVE;
-  } else if (mouse_position.x <= 0) {
+  } else if (mouse_position.x <= MARGIN) {
     camera.target.x -= SCROLL_MOVE;
   }
-  if (mouse_position.y >= screen_height) {
+  if (mouse_position.y >= screen_height - MARGIN) {
     camera.target.y += SCROLL_MOVE;
-  } else if (mouse_position.y <= 0) {
+  } else if (mouse_position.y <= MARGIN) {
     camera.target.y -= SCROLL_MOVE;
   }
 }
