@@ -34,7 +34,7 @@ PROJECT_VERSION       ?= 1.0
 PROJECT_BUILD_PATH    ?= .
 PROJECT_SOURCE_FILES  ?= war_of_progress.c
 
-RAYLIB_SRC_PATH       ?= ~\raylib\include
+RAYLIB_SRC_PATH       ?= ./
 RAYLIB_INCLUDE_PATH   ?= $(RAYLIB_SRC_PATH)
 RAYLIB_LIB_PATH       ?= $(RAYLIB_SRC_PATH)
 

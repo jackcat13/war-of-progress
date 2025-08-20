@@ -35,6 +35,7 @@ enum Tile **map;
 
 int main() {
   InitWindow(0, 0, "War of progress");
+  ToggleFullscreen();
   GuiLoadStyleDefault();
   InitTextures();
 
@@ -91,7 +92,7 @@ static void RenderMainGame(void) {
   ClearBackground(BACKGROUND);
   int i, j;
   int width = grassTexture.width;
-  int height = grassTexture.height;
+  int height = grassTexture.height / 2;
   int iMin =
       ToXInvertedIso(camera.target.x, camera.target.y, width, height) - 50;
   int jMin =
@@ -130,9 +131,9 @@ static void InitCamera(void) {
   float screenWidth = GetScreenWidth();
   float screenHeight = GetScreenHeight();
   float map_center_x = ToXIso(mapSize.x / 2, mapSize.y / 2, grassTexture.width,
-                              grassTexture.height);
+                              grassTexture.height / 2);
   float map_center_y = ToYIso(mapSize.x / 2, mapSize.y / 2, grassTexture.width,
-                              grassTexture.height);
+                              grassTexture.height / 2);
   camera.target = (Vector2){map_center_x, map_center_y};
   camera.offset = (Vector2){screenWidth / 2.0f, screenHeight / 2.0f};
   camera.rotation = 0.0f;
@@ -167,19 +168,19 @@ static Texture2D TileToTexture(enum Tile tile) {
 // ISOMETRIC HELPERS
 
 static float ToXIso(int x, int y, int width, int height) {
-  return (float)(x - y) * width / 2;
+  return (float)(x - y) * (width / 2.0f);
 }
 
 static float ToYIso(int x, int y, int width, int height) {
-  return (float)(x + y) * height / 2;
+  return (float)(x + y) * (height / 2.0f);
 }
 
 static float ToXInvertedIso(int iso_x, int iso_y, int width, int height) {
-  return (float)((iso_x / (width / 2)) + (iso_y / (height / 2))) / 2;
+  return (float)((iso_x / (width / 2.0f)) + (iso_y / (height / 2.0f))) / 2.0f;
 }
 
 static float ToYInvertedIso(int iso_x, int iso_y, int width, int height) {
-  return (float)((iso_y / (height / 2)) - (iso_x / (width / 2))) / 2;
+  return (float)((iso_y / (height / 2.0f)) - (iso_x / (width / 2.0f))) / 2.0f;
 }
 
 // Mouse interactions
