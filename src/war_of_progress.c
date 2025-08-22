@@ -21,17 +21,31 @@ static float ToYIso(int, int, int, int);
 static float ToXInvertedIso(int, int, int, int);
 static float ToYInvertedIso(int, int, int, int);
 static void InitMap(void);
+static void InitEntities(void);
+
+enum EntityType { CITY_HALL };
+
+struct Entity {
+  int x;
+  int y;
+  enum EntityType type;
+  int hp;
+};
 
 enum Scene { MENU, MAIN_GAME };
 enum Scene current_scene = MENU;
 enum Tile { GRASS };
 
 static Texture2D TileToTexture(enum Tile);
+static Texture2D EntityToTexture(enum EntityType);
 
 Camera2D camera = {0};
 Texture2D grassTexture;
+Texture2D primitiveCityHallTexture;
 Vector2 mapSize = {200, 200};
 enum Tile **map;
+struct Entity *entities;
+int entitiesSize;
 
 int main() {
   InitWindow(0, 0, "War of progress");
@@ -76,6 +90,7 @@ static void RenderMenu(void) {
   if (GuiButton((Rectangle){24, 24, 120, 30}, "Start game")) {
     InitCamera();
     InitMap();
+    InitEntities();
     current_scene = MAIN_GAME;
   }
 }
@@ -90,6 +105,9 @@ static void RenderMainGame(void) {
   BeginMode2D(camera);
 
   ClearBackground(BACKGROUND);
+
+  // Draw Map
+
   int i, j;
   int width = grassTexture.width;
   int height = grassTexture.height / 2;
@@ -120,6 +138,15 @@ static void RenderMainGame(void) {
     }
   }
 
+  // Draw entities
+  for (i = 0; i < entitiesSize; i++) {
+    struct Entity entity = entities[i];
+    Texture2D texture = EntityToTexture(entity.type);
+    int x = ToXIso(entity.x, entity.y, grassTexture.width, grassTexture.height / 2);
+    int y = ToYIso(entity.x, entity.y, grassTexture.width, grassTexture.height / 2);
+    DrawTexture(texture, x, y, WHITE); //TODO : animate
+  }
+
   EndMode2D();
 
   DrawFPS(screenWidth - MARGIN, MARGIN);
@@ -142,6 +169,8 @@ static void InitCamera(void) {
 
 static void InitTextures(void) {
   grassTexture = LoadTexture("assets/map/grass.png");
+  primitiveCityHallTexture =
+      LoadTexture("assets/primitive/buildings/cityHall.png");
 }
 
 static void InitMap(void) {
@@ -157,10 +186,26 @@ static void InitMap(void) {
   }
 }
 
+static void InitEntities(void) {
+  entitiesSize = 1;
+  entities = (struct Entity *)malloc(sizeof(struct Entity));
+  int x = ToXInvertedIso(camera.target.x, camera.target.y, grassTexture.width, grassTexture.height / 2);
+  int y = ToYInvertedIso(camera.target.x, camera.target.y, grassTexture.width, grassTexture.height / 2);
+  entities[0] = (struct Entity){x, y, CITY_HALL, 3000};
+}
+
 static Texture2D TileToTexture(enum Tile tile) {
   switch (tile) {
   case GRASS:
     return grassTexture;
+    break;
+  }
+}
+
+static Texture2D EntityToTexture(enum EntityType type) {
+  switch (type) {
+  case CITY_HALL:
+    return primitiveCityHallTexture; // TODO: support ages
     break;
   }
 }
