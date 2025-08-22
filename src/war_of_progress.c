@@ -16,10 +16,10 @@ static void RenderMainGame(void);
 static void InitCamera(void);
 static void CheckMouseScroll(void);
 static void CheckMouseZoom(void);
-static float ToXIso(int, int, int, int);
-static float ToYIso(int, int, int, int);
-static float ToXInvertedIso(int, int, int, int);
-static float ToYInvertedIso(int, int, int, int);
+static float ToXIso(int, int);
+static float ToYIso(int, int);
+static float ToXInvertedIso(int, int);
+static float ToYInvertedIso(int, int);
 static void InitMap(void);
 static void InitEntities(void);
 
@@ -111,12 +111,10 @@ static void RenderMainGame(void) {
   // Draw Map
 
   int i, j;
-  int width = grassTexture.width;
-  int height = grassTexture.height / 2;
   int iMin =
-      ToXInvertedIso(camera.target.x, camera.target.y, width, height) - 50;
+      ToXInvertedIso(camera.target.x, camera.target.y) - 50;
   int jMin =
-      ToYInvertedIso(camera.target.x, camera.target.y, width, height) - 50;
+      ToYInvertedIso(camera.target.x, camera.target.y) - 50;
   int iMax = iMin + 100;
   int jMax = jMin + 100;
   if (iMin < 0) {
@@ -133,8 +131,8 @@ static void RenderMainGame(void) {
   }
   for (j = jMin; j < jMax; j++) {
     for (i = iMin; i < iMax; i++) {
-      float x = ToXIso(i, j, width, height);
-      float y = ToYIso(i, j, width, height);
+      float x = ToXIso(i, j);
+      float y = ToYIso(i, j);
       Texture2D texture = TileToTexture(map[i][j]);
       DrawTexture(texture, x, y, WHITE);
     }
@@ -144,8 +142,8 @@ static void RenderMainGame(void) {
   for (i = 0; i < entitiesSize; i++) {
     struct Entity *entity = &entities[i];
     Texture2D texture = EntityToTexture(entity->type);
-    int x = ToXIso(entity->x, entity->y, grassTexture.width, grassTexture.height / 2);
-    int y = ToYIso(entity->x, entity->y, grassTexture.width, grassTexture.height / 2);
+    int x = ToXIso(entity->x, entity->y);
+    int y = ToYIso(entity->x, entity->y);
     int animWidth = texture.width / entity->animFramesNumber;
     int animOffset = entity->animCurrentFrame * animWidth;
     DrawTextureRec(
@@ -178,10 +176,8 @@ static void RenderMainGame(void) {
 static void InitCamera(void) {
   float screenWidth = GetScreenWidth();
   float screenHeight = GetScreenHeight();
-  float map_center_x = ToXIso(mapSize.x / 2, mapSize.y / 2, grassTexture.width,
-                              grassTexture.height / 2);
-  float map_center_y = ToYIso(mapSize.x / 2, mapSize.y / 2, grassTexture.width,
-                              grassTexture.height / 2);
+  float map_center_x = ToXIso(mapSize.x / 2, mapSize.y / 2);
+  float map_center_y = ToYIso(mapSize.x / 2, mapSize.y / 2);
   camera.target = (Vector2){map_center_x, map_center_y};
   camera.offset = (Vector2){screenWidth / 2.0f, screenHeight / 2.0f};
   camera.rotation = 0.0f;
@@ -210,8 +206,8 @@ static void InitMap(void) {
 static void InitEntities(void) {
   entitiesSize = 1;
   entities = (struct Entity *)malloc(sizeof(struct Entity));
-  int x = ToXInvertedIso(camera.target.x, camera.target.y, grassTexture.width, grassTexture.height / 2);
-  int y = ToYInvertedIso(camera.target.x, camera.target.y, grassTexture.width, grassTexture.height / 2);
+  int x = ToXInvertedIso(camera.target.x, camera.target.y);
+  int y = ToYInvertedIso(camera.target.x, camera.target.y);
   entities[0] = (struct Entity){x, y, CITY_HALL, 3000, 7, 1};
 }
 
@@ -233,20 +229,20 @@ static Texture2D EntityToTexture(enum EntityType type) {
 
 // ISOMETRIC HELPERS
 
-static float ToXIso(int x, int y, int width, int height) {
-  return (float)(x - y) * (width / 2.0f);
+static float ToXIso(int x, int y) {
+  return (float)(x - y) * (grassTexture.width / 2.0f);
 }
 
-static float ToYIso(int x, int y, int width, int height) {
-  return (float)(x + y) * (height / 2.0f);
+static float ToYIso(int x, int y) {
+  return (float)(x + y) * (grassTexture.height / 4.0f);
 }
 
-static float ToXInvertedIso(int iso_x, int iso_y, int width, int height) {
-  return (float)((iso_x / (width / 2.0f)) + (iso_y / (height / 2.0f))) / 2.0f;
+static float ToXInvertedIso(int iso_x, int iso_y) {
+  return (float)((iso_x / (grassTexture.width/ 2.0f)) + (iso_y / (grassTexture.height / 4.0f))) / 2.0f;
 }
 
-static float ToYInvertedIso(int iso_x, int iso_y, int width, int height) {
-  return (float)((iso_y / (height / 2.0f)) - (iso_x / (width / 2.0f))) / 2.0f;
+static float ToYInvertedIso(int iso_x, int iso_y) {
+  return (float)((iso_y / (grassTexture.height / 4.0f)) - (iso_x / (grassTexture.width / 2.0f))) / 2.0f;
 }
 
 // Mouse interactions
