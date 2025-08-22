@@ -30,6 +30,8 @@ struct Entity {
   int y;
   enum EntityType type;
   int hp;
+  int animFramesNumber;
+  int animCurrentFrame;
 };
 
 enum Scene { MENU, MAIN_GAME };
@@ -140,11 +142,30 @@ static void RenderMainGame(void) {
 
   // Draw entities
   for (i = 0; i < entitiesSize; i++) {
-    struct Entity entity = entities[i];
-    Texture2D texture = EntityToTexture(entity.type);
-    int x = ToXIso(entity.x, entity.y, grassTexture.width, grassTexture.height / 2);
-    int y = ToYIso(entity.x, entity.y, grassTexture.width, grassTexture.height / 2);
-    DrawTexture(texture, x, y, WHITE); //TODO : animate
+    struct Entity *entity = &entities[i];
+    Texture2D texture = EntityToTexture(entity->type);
+    int x = ToXIso(entity->x, entity->y, grassTexture.width, grassTexture.height / 2);
+    int y = ToYIso(entity->x, entity->y, grassTexture.width, grassTexture.height / 2);
+    int animWidth = texture.width / entity->animFramesNumber;
+    int animOffset = entity->animCurrentFrame * animWidth;
+    DrawTextureRec(
+      texture,
+      (Rectangle) {
+        animOffset,
+        0,
+        animWidth,
+        texture.height
+      },
+      (Vector2) {
+        x,
+        y
+      },
+      WHITE
+    );
+    entity->animCurrentFrame++;
+    if (entity->animCurrentFrame > entity->animFramesNumber) {
+      entity->animCurrentFrame = 1;
+    }
   }
 
   EndMode2D();
@@ -191,7 +212,7 @@ static void InitEntities(void) {
   entities = (struct Entity *)malloc(sizeof(struct Entity));
   int x = ToXInvertedIso(camera.target.x, camera.target.y, grassTexture.width, grassTexture.height / 2);
   int y = ToYInvertedIso(camera.target.x, camera.target.y, grassTexture.width, grassTexture.height / 2);
-  entities[0] = (struct Entity){x, y, CITY_HALL, 3000};
+  entities[0] = (struct Entity){x, y, CITY_HALL, 3000, 7, 1};
 }
 
 static Texture2D TileToTexture(enum Tile tile) {
