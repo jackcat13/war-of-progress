@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include <stdio.h>
 
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
@@ -23,7 +24,13 @@ static float ToYInvertedIso(int, int);
 static void InitGame(void);
 static void FreeGame(void);
 
-enum EntityType { CITY_HALL };
+enum EntityType {
+  // Units
+  VILLAGER,
+
+  // Buildings
+  CITY_HALL
+};
 
 struct Entity {
   int x;
@@ -44,9 +51,10 @@ static Texture2D EntityToTexture(enum EntityType);
 Camera2D camera = {0};
 Texture2D grassTexture;
 Texture2D primitiveCityHallTexture;
+Texture2D primitiveVillagerTexture;
 Vector2 mapSize = {200, 200};
-enum Tile **map;
-struct Entity *entities;
+enum Tile **map = NULL;
+struct Entity *entities = NULL;
 int entitiesSize;
 
 int main() {
@@ -63,8 +71,8 @@ int main() {
   while (!WindowShouldClose()) {
     UpdateDrawFrame();
   }
-  FreeGame();
 #endif
+  FreeGame();
   CloseWindow();
   return 0;
 }
@@ -140,8 +148,8 @@ static void RenderMainGame(void) {
   for (i = 0; i < entitiesSize; i++) {
     struct Entity *entity = &entities[i];
     Texture2D texture = EntityToTexture(entity->type);
-    int x = ToXIso(entity->x, entity->y);
-    int y = ToYIso(entity->x, entity->y);
+    int x = entity->x;
+    int y = entity->y;
     int animWidth = texture.width / entity->animFramesNumber;
     int animOffset = entity->animCurrentFrame * animWidth;
     DrawTextureRec(texture,
@@ -175,6 +183,7 @@ static void InitTextures(void) {
   grassTexture = LoadTexture("assets/map/grass.png");
   primitiveCityHallTexture =
       LoadTexture("assets/primitive/buildings/cityHall.png");
+  primitiveVillagerTexture = LoadTexture("assets/primitive/units/villager.png");
 }
 
 void InitMap(void) {
@@ -191,11 +200,22 @@ void InitMap(void) {
 }
 
 void InitEntities(void) {
-  entitiesSize = 1;
-  entities = (struct Entity *)malloc(sizeof(struct Entity));
-  int x = ToXInvertedIso(camera.target.x, camera.target.y);
-  int y = ToYInvertedIso(camera.target.x, camera.target.y);
-  entities[0] = (struct Entity){x, y, CITY_HALL, 3000, 7, 1};
+  entitiesSize = 4;
+  entities = (struct Entity *)malloc(entitiesSize * sizeof(struct Entity));
+
+  int mapCenterX = camera.target.x;
+  int mapCenterY = camera.target.y;
+
+  // CITY_HALL
+  entities[0] = (struct Entity){mapCenterX, mapCenterY, CITY_HALL, 3000, 7, 1};
+
+  // VILLAGERS
+  entities[1] =
+      (struct Entity){mapCenterX - 400, mapCenterY, VILLAGER, 100, 1, 1};
+  entities[2] =
+      (struct Entity){mapCenterX, mapCenterY - 400, VILLAGER, 100, 1, 1};
+  entities[3] =
+      (struct Entity){mapCenterX, mapCenterY + 1100, VILLAGER, 100, 1, 1};
 }
 
 static void InitGame(void) {
@@ -218,10 +238,13 @@ static Texture2D TileToTexture(enum Tile tile) {
   }
 }
 
-static Texture2D EntityToTexture(enum EntityType type) {
+static Texture2D EntityToTexture(enum EntityType type) { // TODO: support ages
   switch (type) {
   case CITY_HALL:
-    return primitiveCityHallTexture; // TODO: support ages
+    return primitiveCityHallTexture;
+    break;
+  case VILLAGER:
+    return primitiveVillagerTexture;
     break;
   }
 }
