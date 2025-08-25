@@ -20,8 +20,8 @@ static float ToXIso(int, int);
 static float ToYIso(int, int);
 static float ToXInvertedIso(int, int);
 static float ToYInvertedIso(int, int);
-static void InitMap(void);
-static void InitEntities(void);
+static void InitGame(void);
+static void FreeGame(void);
 
 enum EntityType { CITY_HALL };
 
@@ -63,6 +63,7 @@ int main() {
   while (!WindowShouldClose()) {
     UpdateDrawFrame();
   }
+  FreeGame();
 #endif
   CloseWindow();
   return 0;
@@ -91,8 +92,7 @@ static void RenderMenu(void) {
   ClearBackground(BLACK);
   if (GuiButton((Rectangle){24, 24, 120, 30}, "Start game")) {
     InitCamera();
-    InitMap();
-    InitEntities();
+    InitGame();
     current_scene = MAIN_GAME;
   }
 }
@@ -111,10 +111,8 @@ static void RenderMainGame(void) {
   // Draw Map
 
   int i, j;
-  int iMin =
-      ToXInvertedIso(camera.target.x, camera.target.y) - 50;
-  int jMin =
-      ToYInvertedIso(camera.target.x, camera.target.y) - 50;
+  int iMin = ToXInvertedIso(camera.target.x, camera.target.y) - 50;
+  int jMin = ToYInvertedIso(camera.target.x, camera.target.y) - 50;
   int iMax = iMin + 100;
   int jMax = jMin + 100;
   if (iMin < 0) {
@@ -146,20 +144,9 @@ static void RenderMainGame(void) {
     int y = ToYIso(entity->x, entity->y);
     int animWidth = texture.width / entity->animFramesNumber;
     int animOffset = entity->animCurrentFrame * animWidth;
-    DrawTextureRec(
-      texture,
-      (Rectangle) {
-        animOffset,
-        0,
-        animWidth,
-        texture.height
-      },
-      (Vector2) {
-        x,
-        y
-      },
-      WHITE
-    );
+    DrawTextureRec(texture,
+                   (Rectangle){animOffset, 0, animWidth, texture.height},
+                   (Vector2){x, y}, WHITE);
     entity->animCurrentFrame++;
     if (entity->animCurrentFrame > entity->animFramesNumber) {
       entity->animCurrentFrame = 1;
@@ -190,7 +177,7 @@ static void InitTextures(void) {
       LoadTexture("assets/primitive/buildings/cityHall.png");
 }
 
-static void InitMap(void) {
+void InitMap(void) {
   int i, j;
   map = (enum Tile **)malloc(mapSize.y * sizeof(enum Tile *));
   for (i = 0; i < mapSize.y; i++) {
@@ -203,12 +190,24 @@ static void InitMap(void) {
   }
 }
 
-static void InitEntities(void) {
+void InitEntities(void) {
   entitiesSize = 1;
   entities = (struct Entity *)malloc(sizeof(struct Entity));
   int x = ToXInvertedIso(camera.target.x, camera.target.y);
   int y = ToYInvertedIso(camera.target.x, camera.target.y);
   entities[0] = (struct Entity){x, y, CITY_HALL, 3000, 7, 1};
+}
+
+static void InitGame(void) {
+  InitMap();
+  InitEntities();
+}
+
+static void FreeGame(void) {
+  free(entities);
+  entities = NULL;
+  free(map);
+  map = NULL;
 }
 
 static Texture2D TileToTexture(enum Tile tile) {
@@ -238,11 +237,15 @@ static float ToYIso(int x, int y) {
 }
 
 static float ToXInvertedIso(int iso_x, int iso_y) {
-  return (float)((iso_x / (grassTexture.width/ 2.0f)) + (iso_y / (grassTexture.height / 4.0f))) / 2.0f;
+  return (float)((iso_x / (grassTexture.width / 2.0f)) +
+                 (iso_y / (grassTexture.height / 4.0f))) /
+         2.0f;
 }
 
 static float ToYInvertedIso(int iso_x, int iso_y) {
-  return (float)((iso_y / (grassTexture.height / 4.0f)) - (iso_x / (grassTexture.width / 2.0f))) / 2.0f;
+  return (float)((iso_y / (grassTexture.height / 4.0f)) -
+                 (iso_x / (grassTexture.width / 2.0f))) /
+         2.0f;
 }
 
 // Mouse interactions
