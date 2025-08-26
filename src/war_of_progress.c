@@ -12,6 +12,7 @@
 #endif
 
 static void InitTextures(void);
+static void FreeTextures(void);
 static void UpdateDrawFrame(void);
 static void RenderMenu(void);
 static void RenderMainGame(void);
@@ -84,6 +85,7 @@ int main() {
   }
 #endif
   FreeGame();
+  FreeTextures();
   CloseWindow();
   return 0;
 }
@@ -210,6 +212,12 @@ static void InitTextures(void) {
   primitiveVillagerTexture = LoadTexture("assets/primitive/units/villager.png");
 }
 
+static void FreeTextures(void) {
+  UnloadTexture(grassTexture);
+  UnloadTexture(primitiveCityHallTexture);
+  UnloadTexture(primitiveVillagerTexture);
+}
+
 void InitMap(void) {
   int i, j;
   map = (enum Tile **)malloc(mapSize.y * sizeof(enum Tile *));
@@ -257,6 +265,9 @@ static void InitGame(void) {
 static void FreeGame(void) {
   free(entities);
   entities = NULL;
+  for (int i = 0; i < mapSize.y; i++) {
+    free(map[i]);
+  }
   free(map);
   map = NULL;
 }
