@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include <stdbool.h>
 #include <stdio.h>
 
 #define RAYGUI_IMPLEMENTATION
@@ -15,7 +16,7 @@ static void UpdateDrawFrame(void);
 static void RenderMenu(void);
 static void RenderMainGame(void);
 static void InitCamera(void);
-static void CheckMouseScroll(void);
+static void CheckScroll(void);
 static void CheckMouseZoom(void);
 static float ToXIso(int, int);
 static float ToYIso(int, int);
@@ -23,6 +24,7 @@ static float ToXInvertedIso(int, int);
 static float ToYInvertedIso(int, int);
 static void InitGame(void);
 static void FreeGame(void);
+static void DrawTopHud(void);
 
 enum EntityType {
   // Units
@@ -41,6 +43,12 @@ struct Entity {
   int animCurrentFrame;
 };
 
+struct Resources {
+  int wood;
+  int stone;
+  int gold;
+};
+
 enum Scene { MENU, MAIN_GAME };
 enum Scene current_scene = MENU;
 enum Tile { GRASS };
@@ -56,10 +64,13 @@ Vector2 mapSize = {200, 200};
 enum Tile **map = NULL;
 struct Entity *entities = NULL;
 int entitiesSize;
+struct Resources resources;
+
+const int GAME_FONT_SIZE = 20;
 
 int main() {
+  SetConfigFlags(FLAG_WINDOW_HIGHDPI);
   InitWindow(0, 0, "War of progress");
-  ToggleFullscreen();
   GuiLoadStyleDefault();
   InitTextures();
 
@@ -85,7 +96,7 @@ static void UpdateDrawFrame(void) {
     RenderMenu();
     break;
   case MAIN_GAME:
-    CheckMouseScroll();
+    CheckScroll();
     CheckMouseZoom();
     RenderMainGame();
     break;
@@ -163,7 +174,15 @@ static void RenderMainGame(void) {
 
   EndMode2D();
 
-  DrawFPS(screenWidth - MARGIN, MARGIN);
+  DrawTopHud();
+}
+
+static void DrawTopHud(void) {
+  int screenWidth = GetScreenWidth();
+  DrawRectangle(0, 0, screenWidth, MARGIN * 2, BLACK);
+  const char* resourcesText = TextFormat("Wood : %i - Stone : %i - Gold : %i", resources.wood, resources.stone, resources.gold);
+  DrawText(resourcesText, MARGIN, MARGIN, 20, WHITE);
+  DrawFPS(screenWidth - MARGIN - MeasureText("120 FPS", GAME_FONT_SIZE), MARGIN);
 }
 
 // INITS
@@ -180,9 +199,14 @@ static void InitCamera(void) {
 }
 
 static void InitTextures(void) {
+  // MAP TILES
   grassTexture = LoadTexture("assets/map/grass.png");
+
+  // Buildings
   primitiveCityHallTexture =
       LoadTexture("assets/primitive/buildings/cityHall.png");
+
+  // Units
   primitiveVillagerTexture = LoadTexture("assets/primitive/units/villager.png");
 }
 
@@ -218,9 +242,16 @@ void InitEntities(void) {
       (struct Entity){mapCenterX, mapCenterY + 1100, VILLAGER, 100, 1, 1};
 }
 
+void InitResources(void) {
+  resources.wood = 50;
+  resources.stone = 50;
+  resources.gold = 0;
+}
+
 static void InitGame(void) {
   InitMap();
   InitEntities();
+  InitResources();
 }
 
 static void FreeGame(void) {
@@ -271,22 +302,48 @@ static float ToYInvertedIso(int iso_x, int iso_y) {
          2.0f;
 }
 
-// Mouse interactions
+// COLLISIONS HELPERS
+
+static bool IsRightScreenHit(int x) {
+  return x >= GetScreenWidth() - MARGIN;
+}
+
+static bool IsLeftScreenHit(int x) {
+  return x <= MARGIN;
+}
+
+static bool IsBottomScreenHit(int y) {
+  return y >= GetScreenHeight() - MARGIN;
+}
+
+static bool IsTopScreenHit(int y) {
+  return y <= MARGIN;
+}
+
+// Mouse or Keyboard interactions
 
 const int SCROLL_MOVE = 80;
 
-static void CheckMouseScroll(void) {
-  int screen_width = GetScreenWidth();
-  int screen_height = GetScreenHeight();
+static void CheckScroll(void) {
   Vector2 mouse_position = GetMousePosition();
-  if (mouse_position.x >= screen_width - MARGIN) {
+  if (IsKeyDown(KEY_RIGHT)) {
     camera.target.x += SCROLL_MOVE;
-  } else if (mouse_position.x <= MARGIN) {
+  } else if (IsKeyDown(KEY_LEFT)) {
     camera.target.x -= SCROLL_MOVE;
   }
-  if (mouse_position.y >= screen_height - MARGIN) {
+  if (IsKeyDown(KEY_DOWN)) {
     camera.target.y += SCROLL_MOVE;
-  } else if (mouse_position.y <= MARGIN) {
+  } else if (IsKeyDown(KEY_UP)) {
+    camera.target.y -= SCROLL_MOVE;
+  }
+  if (IsRightScreenHit(mouse_position.x)) {
+    camera.target.x += SCROLL_MOVE;
+  } else if (IsLeftScreenHit(mouse_position.x)) {
+    camera.target.x -= SCROLL_MOVE;
+  }
+  if (IsBottomScreenHit(mouse_position.y)) {
+    camera.target.y += SCROLL_MOVE;
+  } else if (IsTopScreenHit(mouse_position.y)) {
     camera.target.y -= SCROLL_MOVE;
   }
 }
