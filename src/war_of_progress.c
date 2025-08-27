@@ -19,6 +19,7 @@ static void RenderMainGame(void);
 static void InitCamera(void);
 static void CheckScroll(void);
 static void CheckMouseZoom(void);
+static void CheckSelect(void);
 static float ToXIso(int, int);
 static float ToYIso(int, int);
 static float ToXInvertedIso(int, int);
@@ -36,12 +37,12 @@ enum EntityType {
 };
 
 struct Entity {
-  int x;
-  int y;
+  Vector2 position;
   enum EntityType type;
   int hp;
   int animFramesNumber;
   int animCurrentFrame;
+  bool isSelected;
 };
 
 struct Resources {
@@ -64,7 +65,7 @@ Texture2D primitiveVillagerTexture;
 Vector2 mapSize = {200, 200};
 enum Tile **map = NULL;
 struct Entity *entities = NULL;
-int entitiesSize;
+int entitiesSize = 0;
 struct Resources resources;
 
 const int GAME_FONT_SIZE = 20;
@@ -100,6 +101,7 @@ static void UpdateDrawFrame(void) {
   case MAIN_GAME:
     CheckScroll();
     CheckMouseZoom();
+    CheckSelect();
     RenderMainGame();
     break;
   }
@@ -161,8 +163,8 @@ static void RenderMainGame(void) {
   for (i = 0; i < entitiesSize; i++) {
     struct Entity *entity = &entities[i];
     Texture2D texture = EntityToTexture(entity->type);
-    int x = entity->x;
-    int y = entity->y;
+    int x = entity->position.x;
+    int y = entity->position.y;
     int animWidth = texture.width / entity->animFramesNumber;
     int animOffset = entity->animCurrentFrame * animWidth;
     DrawTextureRec(texture,
@@ -171,6 +173,11 @@ static void RenderMainGame(void) {
     entity->animCurrentFrame++;
     if (entity->animCurrentFrame > entity->animFramesNumber) {
       entity->animCurrentFrame = 1;
+    }
+
+    if (entity->isSelected) {
+      // TODO : Draw a circle around entity instead
+      DrawText("SELECTED", x, y, 60, WHITE);
     }
   }
 
@@ -182,9 +189,19 @@ static void RenderMainGame(void) {
 static void DrawTopHud(void) {
   int screenWidth = GetScreenWidth();
   DrawRectangle(0, 0, screenWidth, MARGIN * 2, BLACK);
-  const char* resourcesText = TextFormat("Wood : %i - Stone : %i - Gold : %i", resources.wood, resources.stone, resources.gold);
+  const char *resourcesText =
+      TextFormat("Wood : %i - Stone : %i - Gold : %i", resources.wood,
+                 resources.stone, resources.gold);
   DrawText(resourcesText, MARGIN, MARGIN, 20, WHITE);
-  DrawFPS(screenWidth - MARGIN - MeasureText("120 FPS", GAME_FONT_SIZE), MARGIN);
+  DrawFPS(screenWidth - MARGIN - MeasureText("120 FPS", GAME_FONT_SIZE),
+          MARGIN);
+}
+
+// SELECTED ENTITIES HELPERS
+
+static void AddToSelectedEntities(struct Entity *entity) {
+  printf("Add to selected\n");
+  entity->isSelected = true;
 }
 
 // INITS
@@ -262,14 +279,36 @@ static void InitGame(void) {
   InitResources();
 }
 
-static void FreeGame(void) {
-  free(entities);
-  entities = NULL;
-  for (int i = 0; i < mapSize.y; i++) {
-    free(map[i]);
+static void FreeEntities(void) {
+  if (entities) {
+    free(entities);
+    entities = NULL;
+    entitiesSize = 0;
   }
-  free(map);
-  map = NULL;
+}
+
+static void FreeSelectedEntities(void) {
+  for (int i = 0; i < entitiesSize; i++) {
+    entities[i].isSelected = false;
+  }
+}
+
+static void FreeMap(void) {
+  if (map) {
+    for (int i = 0; i < mapSize.y; i++) {
+      if (map[i]) {
+        free(map[i]);
+      }
+    }
+    free(map);
+    map = NULL;
+  }
+}
+
+static void FreeGame(void) {
+  FreeEntities();
+  FreeSelectedEntities();
+  FreeMap();
 }
 
 static Texture2D TileToTexture(enum Tile tile) {
@@ -315,20 +354,22 @@ static float ToYInvertedIso(int iso_x, int iso_y) {
 
 // COLLISIONS HELPERS
 
-static bool IsRightScreenHit(int x) {
-  return x >= GetScreenWidth() - MARGIN;
-}
+static bool IsRightScreenHit(int x) { return x >= GetScreenWidth() - MARGIN; }
 
-static bool IsLeftScreenHit(int x) {
-  return x <= MARGIN;
-}
+static bool IsLeftScreenHit(int x) { return x <= MARGIN; }
 
-static bool IsBottomScreenHit(int y) {
-  return y >= GetScreenHeight() - MARGIN;
-}
+static bool IsBottomScreenHit(int y) { return y >= GetScreenHeight() - MARGIN; }
 
-static bool IsTopScreenHit(int y) {
-  return y <= MARGIN;
+static bool IsTopScreenHit(int y) { return y <= MARGIN; }
+
+static bool IsHit(Vector2 testPosition, Vector2 targetPosition,
+                  Vector2 targetSize) {
+  printf("\n%f %f %f %f %f %f\n", testPosition.x, testPosition.y,
+         targetPosition.x, targetPosition.y, targetSize.x, targetSize.y);
+  return testPosition.x >= targetPosition.x &&
+         testPosition.x <= (targetPosition.x + targetSize.x) &&
+         testPosition.y >= targetPosition.y &&
+         testPosition.y <= (targetPosition.y + targetSize.y);
 }
 
 // Mouse or Keyboard interactions
@@ -363,5 +404,26 @@ static void CheckMouseZoom(void) {
   float wheelDelta = GetMouseWheelMove() / 10;
   if (camera.zoom - wheelDelta > 0.1f && camera.zoom - wheelDelta < 3.0f) {
     camera.zoom -= wheelDelta;
+  }
+}
+
+static void CheckSelect(void) {
+  Vector2 mousePosition = GetMousePosition();
+  if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    return;
+  FreeSelectedEntities();
+  for (int i = 0; i < entitiesSize; i++) {
+    struct Entity *entity = &entities[i];
+    Texture2D entityTexture = EntityToTexture(entity->type);
+    int entityWidth = entityTexture.width / (float)entity->animFramesNumber;
+    int entityHeight = entityTexture.height;
+    Vector2 entitySize =
+        (Vector2){entityWidth, entityHeight};
+    Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, camera);
+    if (IsHit(mousePositionInWorld, entity->position, entitySize)) {
+      printf("Select checked\n");
+      AddToSelectedEntities(entity);
+      return;
+    }
   }
 }
