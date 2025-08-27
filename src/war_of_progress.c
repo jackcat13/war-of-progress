@@ -5,8 +5,6 @@
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
 
-#include <stdio.h>
-
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
 #endif
@@ -167,17 +165,16 @@ static void RenderMainGame(void) {
     int y = entity->position.y;
     int animWidth = texture.width / entity->animFramesNumber;
     int animOffset = entity->animCurrentFrame * animWidth;
+    Color textureColor = WHITE;
+    if (entity->isSelected) {
+      textureColor = (Color) {66, 245, 102, 220}; 
+    }
     DrawTextureRec(texture,
                    (Rectangle){animOffset, 0, animWidth, texture.height},
-                   (Vector2){x, y}, WHITE);
+                   (Vector2){x, y}, textureColor);
     entity->animCurrentFrame++;
     if (entity->animCurrentFrame > entity->animFramesNumber) {
       entity->animCurrentFrame = 1;
-    }
-
-    if (entity->isSelected) {
-      // TODO : Draw a circle around entity instead
-      DrawText("SELECTED", x, y, 60, WHITE);
     }
   }
 
