@@ -15,8 +15,8 @@ static void UpdateDrawFrame(void);
 static void RenderMenu(void);
 static void RenderMainGame(void);
 static void InitCamera(void);
-static void CheckScroll(void);
-static void CheckMouseZoom(void);
+static void CheckScroll(Camera2D*);
+static void CheckMouseZoom(Camera2D*);
 static void CheckSelect(void);
 static float ToXIso(int, int);
 static float ToYIso(int, int);
@@ -97,8 +97,8 @@ static void UpdateDrawFrame(void) {
     RenderMenu();
     break;
   case MAIN_GAME:
-    CheckScroll();
-    CheckMouseZoom();
+    CheckScroll(&camera);
+    CheckMouseZoom(&camera);
     CheckSelect();
     RenderMainGame();
     break;
@@ -373,34 +373,34 @@ static bool IsHit(Vector2 testPosition, Vector2 targetPosition,
 
 const int SCROLL_MOVE = 80;
 
-static void CheckScroll(void) {
+static void CheckScroll(Camera2D* camera) {
   Vector2 mouse_position = GetMousePosition();
   if (IsKeyDown(KEY_RIGHT)) {
-    camera.target.x += SCROLL_MOVE;
+    camera->target.x += SCROLL_MOVE;
   } else if (IsKeyDown(KEY_LEFT)) {
-    camera.target.x -= SCROLL_MOVE;
+    camera->target.x -= SCROLL_MOVE;
   }
   if (IsKeyDown(KEY_DOWN)) {
-    camera.target.y += SCROLL_MOVE;
+    camera->target.y += SCROLL_MOVE;
   } else if (IsKeyDown(KEY_UP)) {
-    camera.target.y -= SCROLL_MOVE;
+    camera->target.y -= SCROLL_MOVE;
   }
   if (IsRightScreenHit(mouse_position.x)) {
-    camera.target.x += SCROLL_MOVE;
+    camera->target.x += SCROLL_MOVE;
   } else if (IsLeftScreenHit(mouse_position.x)) {
-    camera.target.x -= SCROLL_MOVE;
+    camera->target.x -= SCROLL_MOVE;
   }
   if (IsBottomScreenHit(mouse_position.y)) {
-    camera.target.y += SCROLL_MOVE;
+    camera->target.y += SCROLL_MOVE;
   } else if (IsTopScreenHit(mouse_position.y)) {
-    camera.target.y -= SCROLL_MOVE;
+    camera->target.y -= SCROLL_MOVE;
   }
 }
 
-static void CheckMouseZoom(void) {
+static void CheckMouseZoom(Camera2D* camera) {
   float wheelDelta = GetMouseWheelMove() / 10;
-  if (camera.zoom - wheelDelta > 0.1f && camera.zoom - wheelDelta < 3.0f) {
-    camera.zoom -= wheelDelta;
+  if (camera->zoom - wheelDelta > 0.1f && camera->zoom - wheelDelta < 3.0f) {
+    camera->zoom -= wheelDelta;
   }
 }
 

@@ -167,6 +167,7 @@ else
     else
         ifeq ($(PLATFORM_OS),OSX)
             CFLAGS += -O2
+						CFLAGS += $(shell pkg-config --cflags raylib)
         else
             CFLAGS += -s -O2
         endif
@@ -215,6 +216,9 @@ ifeq ($(PLATFORM),PLATFORM_DESKTOP)
         # Precedence: immediately local, installed version, raysan5 provided libs
         #LDFLAGS += -L$(RAYLIB_RELEASE_PATH)
     endif
+		ifeq ($(PLATFORM_OS),OSX)
+				LDFLAGS += $(shell pkg-config --libs raylib)
+		endif
 endif
 ifeq ($(PLATFORM),PLATFORM_WEB)
     # -Os                        # size optimization
