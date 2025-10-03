@@ -38,11 +38,15 @@ enum EntityType {
   CITY_HALL
 };
 
+typedef struct GameTexture {
+  Texture2D texture;
+  int animFramesNumber;
+} GameTexture;
+
 struct Entity {
   Vector2 position;
   enum EntityType type;
   int hp;
-  int animFramesNumber;
   int animCurrentFrame;
   bool isSelected;
   Vector2 targetPosition;
@@ -53,7 +57,6 @@ struct Entity createCityHallEntity(int x, int y) {
   return (struct Entity){.position = {x, y},
                          .type = CITY_HALL,
                          .hp = 3000,
-                         .animFramesNumber = 7,
                          .animCurrentFrame = 1,
                          .targetPosition = {x, y},
                          .isControllable = false};
@@ -63,7 +66,6 @@ struct Entity createVillagerEntity(int x, int y) {
   return (struct Entity){.position = {x, y},
                          .type = VILLAGER,
                          .hp = 100,
-                         .animFramesNumber = 1,
                          .animCurrentFrame = 1,
                          .targetPosition = {x, y},
                          .isControllable = true};
@@ -79,19 +81,21 @@ enum Scene { MENU, MAIN_GAME };
 enum Scene current_scene = MENU;
 enum Tile { GRASS };
 
-static Texture2D TileToTexture(enum Tile);
-static Texture2D EntityToTexture(enum EntityType);
+static GameTexture TileToTexture(enum Tile);
+static GameTexture EntityToTexture(enum EntityType);
 
 static Camera2D camera = {0};
-static Texture2D grassTexture;
-static Texture2D primitiveCityHallTexture;
-static Texture2D primitiveVillagerTexture;
+static GameTexture grassTexture;
+static GameTexture primitiveCityHallTexture;
+static GameTexture primitiveShelterTexture;
+static GameTexture primitiveVillagerTexture;
 static Vector2 mapSize = {200, 200};
 static enum Tile **map = NULL;
 static struct Entity *entities = NULL;
 static int entitiesSize = 0;
 static struct Resources resources;
 static bool toggleHelp = false;
+static GameTexture *atCursorTexture = NULL;
 
 const int GAME_FONT_SIZE = 20;
 
@@ -190,30 +194,45 @@ static void RenderMainGame(void) {
     for (i = iMin; i < iMax; i++) {
       float x = ToXIso(i, j);
       float y = ToYIso(i, j);
-      Texture2D texture = TileToTexture(map[i][j]);
-      DrawTexture(texture, x, y, WHITE);
+      GameTexture texture = TileToTexture(map[i][j]);
+      DrawTexture(texture.texture, x, y, WHITE);
     }
   }
 
   // Draw entities
   for (i = 0; i < entitiesSize; i++) {
     struct Entity *entity = &entities[i];
-    Texture2D texture = EntityToTexture(entity->type);
+    GameTexture texture = EntityToTexture(entity->type);
     int x = entity->position.x;
     int y = entity->position.y;
-    int animWidth = texture.width / entity->animFramesNumber;
+    int animWidth = texture.texture.width / texture.animFramesNumber;
     int animOffset = entity->animCurrentFrame * animWidth;
     Color textureColor = WHITE;
     if (entity->isSelected) {
       textureColor = (Color){66, 245, 102, 220};
     }
-    DrawTextureRec(texture,
-                   (Rectangle){animOffset, 0, animWidth, texture.height},
-                   (Vector2){x, y}, textureColor);
+    DrawTextureRec(
+        texture.texture,
+        (Rectangle){animOffset, 0, animWidth, texture.texture.height},
+        (Vector2){x, y}, textureColor);
     entity->animCurrentFrame++;
-    if (entity->animCurrentFrame > entity->animFramesNumber) {
+    if (entity->animCurrentFrame > texture.animFramesNumber) {
       entity->animCurrentFrame = 1;
     }
+  }
+
+  // May draw texture at cursor position for builds
+  if (atCursorTexture != NULL) {
+    Vector2 screenMousePosition = GetMousePosition();
+    Vector2 mousePosition = GetScreenToWorld2D(screenMousePosition, camera);
+    float textureWidth = (float)atCursorTexture->texture.width /
+                         atCursorTexture->animFramesNumber;
+    float textureHeight = (float)atCursorTexture->texture.height;
+    Rectangle textureFrameSize = (Rectangle){0, 0, textureWidth, textureHeight};
+    DrawTextureRec(atCursorTexture->texture, textureFrameSize,
+                   (Vector2){mousePosition.x - textureWidth / 2,
+                             mousePosition.y - textureHeight / 2},
+                   (Color){255, 255, 255, 150});
   }
 
   EndMode2D();
@@ -228,8 +247,10 @@ static void RenderMainGame(void) {
 static void DrawHelpWindow(int screenWidth, int screenHeight) {
   DrawRectangle(screenWidth / 4, screenHeight / 4, screenWidth / 2,
                 screenHeight / 2, BLACK);
-  const char *helpText = "ACTION KEYS\nS - Build a shelter (+5 pop). Cost:  50 wood.";
-  DrawText(helpText, screenWidth / 4 + MARGIN, screenHeight / 4 + MARGIN, GAME_FONT_SIZE, WHITE);
+  const char *helpText =
+      "ACTION KEYS\nS - Build a shelter (+5 pop). Cost:  50 wood.";
+  DrawText(helpText, screenWidth / 4 + MARGIN, screenHeight / 4 + MARGIN,
+           GAME_FONT_SIZE, WHITE);
 }
 
 static void DrawTopHud(void) {
@@ -265,20 +286,27 @@ static void InitCamera(void) {
 
 static void InitTextures(void) {
   // MAP TILES
-  grassTexture = LoadTexture("assets/map/grass.png");
+  grassTexture = (struct GameTexture){
+      .texture = LoadTexture("assets/map/grass.png"), .animFramesNumber = 1};
 
   // Buildings
-  primitiveCityHallTexture =
-      LoadTexture("assets/primitive/buildings/cityHall.png");
+  primitiveCityHallTexture = (struct GameTexture){
+      .texture = LoadTexture("assets/primitive/buildings/cityHall.png"),
+      .animFramesNumber = 7};
+  primitiveShelterTexture = (struct GameTexture){
+      .texture = LoadTexture("assets/primitive/buildings/shelter.png"),
+      .animFramesNumber = 7};
 
   // Units
-  primitiveVillagerTexture = LoadTexture("assets/primitive/units/villager.png");
+  primitiveVillagerTexture = (struct GameTexture){
+      .texture = LoadTexture("assets/primitive/units/villager.png"),
+      .animFramesNumber = 1};
 }
 
 static void FreeTextures(void) {
-  UnloadTexture(grassTexture);
-  UnloadTexture(primitiveCityHallTexture);
-  UnloadTexture(primitiveVillagerTexture);
+  UnloadTexture(grassTexture.texture);
+  UnloadTexture(primitiveCityHallTexture.texture);
+  UnloadTexture(primitiveVillagerTexture.texture);
 }
 
 void InitMap(void) {
@@ -354,7 +382,7 @@ static void FreeGame(void) {
   FreeMap();
 }
 
-static Texture2D TileToTexture(enum Tile tile) {
+static GameTexture TileToTexture(enum Tile tile) {
   switch (tile) {
   case GRASS:
     return grassTexture;
@@ -362,7 +390,7 @@ static Texture2D TileToTexture(enum Tile tile) {
   }
 }
 
-static Texture2D EntityToTexture(enum EntityType type) { // TODO: support ages
+static GameTexture EntityToTexture(enum EntityType type) { // TODO: support ages
   switch (type) {
   case CITY_HALL:
     return primitiveCityHallTexture;
@@ -376,22 +404,22 @@ static Texture2D EntityToTexture(enum EntityType type) { // TODO: support ages
 // ISOMETRIC HELPERS
 
 static float ToXIso(int x, int y) {
-  return (float)(x - y) * (grassTexture.width / 2.0f);
+  return (float)(x - y) * (grassTexture.texture.width / 2.0f);
 }
 
 static float ToYIso(int x, int y) {
-  return (float)(x + y) * (grassTexture.height / 4.0f);
+  return (float)(x + y) * (grassTexture.texture.height / 4.0f);
 }
 
 static float ToXInvertedIso(int iso_x, int iso_y) {
-  return (float)((iso_x / (grassTexture.width / 2.0f)) +
-                 (iso_y / (grassTexture.height / 4.0f))) /
+  return (float)((iso_x / (grassTexture.texture.width / 2.0f)) +
+                 (iso_y / (grassTexture.texture.height / 4.0f))) /
          2.0f;
 }
 
 static float ToYInvertedIso(int iso_x, int iso_y) {
-  return (float)((iso_y / (grassTexture.height / 4.0f)) -
-                 (iso_x / (grassTexture.width / 2.0f))) /
+  return (float)((iso_y / (grassTexture.texture.height / 4.0f)) -
+                 (iso_x / (grassTexture.texture.width / 2.0f))) /
          2.0f;
 }
 
@@ -457,9 +485,10 @@ static void CheckSelect(Camera2D *camera) {
   FreeSelectedEntities();
   for (int i = 0; i < entitiesSize; i++) {
     struct Entity *entity = &entities[i];
-    Texture2D entityTexture = EntityToTexture(entity->type);
-    int entityWidth = entityTexture.width / (float)entity->animFramesNumber;
-    int entityHeight = entityTexture.height;
+    GameTexture entityTexture = EntityToTexture(entity->type);
+    int entityWidth =
+        entityTexture.texture.width / (float)entityTexture.animFramesNumber;
+    int entityHeight = entityTexture.texture.height;
     Vector2 entitySize = (Vector2){entityWidth, entityHeight};
     Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, *camera);
     if (IsHit(mousePositionInWorld, entity->position, entitySize)) {
@@ -487,5 +516,8 @@ static void CheckMovement(Camera2D *camera) {
 static void CheckInputs() {
   if (IsKeyPressed(KEY_H)) {
     toggleHelp = !toggleHelp;
+  }
+  if (IsKeyPressed(KEY_S)) {
+    atCursorTexture = &primitiveShelterTexture;
   }
 }
