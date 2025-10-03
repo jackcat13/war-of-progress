@@ -13,11 +13,13 @@ static void InitTextures(void);
 static void FreeTextures(void);
 static void UpdateDrawFrame(void);
 static void RenderMenu(void);
+static void ProcessMovements(void);
 static void RenderMainGame(void);
 static void InitCamera(void);
-static void CheckScroll(Camera2D*);
-static void CheckMouseZoom(Camera2D*);
-static void CheckSelect(void);
+static void CheckScroll(Camera2D *);
+static void CheckMouseZoom(Camera2D *);
+static void CheckSelect(Camera2D *);
+static void CheckMovement(Camera2D *);
 static float ToXIso(int, int);
 static float ToYIso(int, int);
 static float ToXInvertedIso(int, int);
@@ -41,7 +43,29 @@ struct Entity {
   int animFramesNumber;
   int animCurrentFrame;
   bool isSelected;
+  Vector2 targetPosition;
+  bool isControllable;
 };
+
+struct Entity createCityHallEntity(int x, int y) {
+  return (struct Entity){.position = {x, y},
+                         .type = CITY_HALL,
+                         .hp = 3000,
+                         .animFramesNumber = 7,
+                         .animCurrentFrame = 1,
+                         .targetPosition = {x, y},
+                         .isControllable = false};
+}
+
+struct Entity createVillagerEntity(int x, int y) {
+  return (struct Entity){.position = {x, y},
+                         .type = VILLAGER,
+                         .hp = 100,
+                         .animFramesNumber = 1,
+                         .animCurrentFrame = 1,
+                         .targetPosition = {x, y},
+                         .isControllable = true};
+}
 
 struct Resources {
   int wood;
@@ -99,7 +123,9 @@ static void UpdateDrawFrame(void) {
   case MAIN_GAME:
     CheckScroll(&camera);
     CheckMouseZoom(&camera);
-    CheckSelect();
+    CheckSelect(&camera);
+    CheckMovement(&camera);
+    ProcessMovements();
     RenderMainGame();
     break;
   }
@@ -115,6 +141,14 @@ static void RenderMenu(void) {
     InitCamera();
     InitGame();
     current_scene = MAIN_GAME;
+  }
+}
+
+static void ProcessMovements(void) {
+  for (int i = 0; i < entitiesSize; i++) {
+    struct Entity *entity = &entities[i];
+    //TODO: calculate next position instead of teleport
+    entity->position = entity->targetPosition;
   }
 }
 
@@ -167,7 +201,7 @@ static void RenderMainGame(void) {
     int animOffset = entity->animCurrentFrame * animWidth;
     Color textureColor = WHITE;
     if (entity->isSelected) {
-      textureColor = (Color) {66, 245, 102, 220}; 
+      textureColor = (Color){66, 245, 102, 220};
     }
     DrawTextureRec(texture,
                    (Rectangle){animOffset, 0, animWidth, texture.height},
@@ -253,15 +287,12 @@ void InitEntities(void) {
   int mapCenterY = camera.target.y;
 
   // CITY_HALL
-  entities[0] = (struct Entity){mapCenterX, mapCenterY, CITY_HALL, 3000, 7, 1};
+  entities[0] = createCityHallEntity(mapCenterX, mapCenterY);
 
   // VILLAGERS
-  entities[1] =
-      (struct Entity){mapCenterX - 400, mapCenterY, VILLAGER, 100, 1, 1};
-  entities[2] =
-      (struct Entity){mapCenterX, mapCenterY - 400, VILLAGER, 100, 1, 1};
-  entities[3] =
-      (struct Entity){mapCenterX, mapCenterY + 1100, VILLAGER, 100, 1, 1};
+  entities[1] = createVillagerEntity(mapCenterX - 400, mapCenterY);
+  entities[2] = createVillagerEntity(mapCenterX, mapCenterY - 400);
+  entities[3] = createVillagerEntity(mapCenterX, mapCenterY + 1100);
 }
 
 void InitResources(void) {
@@ -373,7 +404,7 @@ static bool IsHit(Vector2 testPosition, Vector2 targetPosition,
 
 const int SCROLL_MOVE = 80;
 
-static void CheckScroll(Camera2D* camera) {
+static void CheckScroll(Camera2D *camera) {
   Vector2 mouse_position = GetMousePosition();
   if (IsKeyDown(KEY_RIGHT)) {
     camera->target.x += SCROLL_MOVE;
@@ -397,14 +428,14 @@ static void CheckScroll(Camera2D* camera) {
   }
 }
 
-static void CheckMouseZoom(Camera2D* camera) {
+static void CheckMouseZoom(Camera2D *camera) {
   float wheelDelta = GetMouseWheelMove() / 10;
   if (camera->zoom - wheelDelta > 0.1f && camera->zoom - wheelDelta < 3.0f) {
     camera->zoom -= wheelDelta;
   }
 }
 
-static void CheckSelect(void) {
+static void CheckSelect(Camera2D *camera) {
   Vector2 mousePosition = GetMousePosition();
   if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
     return;
@@ -414,13 +445,26 @@ static void CheckSelect(void) {
     Texture2D entityTexture = EntityToTexture(entity->type);
     int entityWidth = entityTexture.width / (float)entity->animFramesNumber;
     int entityHeight = entityTexture.height;
-    Vector2 entitySize =
-        (Vector2){entityWidth, entityHeight};
-    Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, camera);
+    Vector2 entitySize = (Vector2){entityWidth, entityHeight};
+    Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, *camera);
     if (IsHit(mousePositionInWorld, entity->position, entitySize)) {
       printf("Select checked\n");
       AddToSelectedEntities(entity);
       return;
     }
+  }
+}
+
+static void CheckMovement(Camera2D *camera) {
+  Vector2 mousePosition = GetMousePosition();
+  if (!IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
+    return;
+  for (int i = 0; i < entitiesSize; i++) {
+    struct Entity *entity = &entities[i];
+    if (!entity->isControllable || !entity->isSelected) {
+      continue;
+    }
+    Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, *camera);
+    entity->targetPosition = mousePositionInWorld;
   }
 }
