@@ -20,12 +20,14 @@ static void CheckScroll(Camera2D *);
 static void CheckMouseZoom(Camera2D *);
 static void CheckSelect(Camera2D *);
 static void CheckMovement(Camera2D *);
+static void CheckInputs();
 static float ToXIso(int, int);
 static float ToYIso(int, int);
 static float ToXInvertedIso(int, int);
 static float ToYInvertedIso(int, int);
 static void InitGame(void);
 static void FreeGame(void);
+static void DrawHelpWindow(int, int);
 static void DrawTopHud(void);
 
 enum EntityType {
@@ -80,15 +82,16 @@ enum Tile { GRASS };
 static Texture2D TileToTexture(enum Tile);
 static Texture2D EntityToTexture(enum EntityType);
 
-Camera2D camera = {0};
-Texture2D grassTexture;
-Texture2D primitiveCityHallTexture;
-Texture2D primitiveVillagerTexture;
-Vector2 mapSize = {200, 200};
-enum Tile **map = NULL;
-struct Entity *entities = NULL;
-int entitiesSize = 0;
-struct Resources resources;
+static Camera2D camera = {0};
+static Texture2D grassTexture;
+static Texture2D primitiveCityHallTexture;
+static Texture2D primitiveVillagerTexture;
+static Vector2 mapSize = {200, 200};
+static enum Tile **map = NULL;
+static struct Entity *entities = NULL;
+static int entitiesSize = 0;
+static struct Resources resources;
+static bool toggleHelp = false;
 
 const int GAME_FONT_SIZE = 20;
 
@@ -125,6 +128,7 @@ static void UpdateDrawFrame(void) {
     CheckMouseZoom(&camera);
     CheckSelect(&camera);
     CheckMovement(&camera);
+    CheckInputs();
     ProcessMovements();
     RenderMainGame();
     break;
@@ -147,7 +151,7 @@ static void RenderMenu(void) {
 static void ProcessMovements(void) {
   for (int i = 0; i < entitiesSize; i++) {
     struct Entity *entity = &entities[i];
-    //TODO: calculate next position instead of teleport
+    // TODO: calculate next position instead of teleport
     entity->position = entity->targetPosition;
   }
 }
@@ -214,16 +218,27 @@ static void RenderMainGame(void) {
 
   EndMode2D();
 
+  if (toggleHelp) {
+    DrawHelpWindow(screenWidth, screenHeight);
+  }
+
   DrawTopHud();
+}
+
+static void DrawHelpWindow(int screenWidth, int screenHeight) {
+  DrawRectangle(screenWidth / 4, screenHeight / 4, screenWidth / 2,
+                screenHeight / 2, BLACK);
+  const char *helpText = "ACTION KEYS\nS - Build a shelter (+5 pop). Cost:  50 wood.";
+  DrawText(helpText, screenWidth / 4 + MARGIN, screenHeight / 4 + MARGIN, GAME_FONT_SIZE, WHITE);
 }
 
 static void DrawTopHud(void) {
   int screenWidth = GetScreenWidth();
   DrawRectangle(0, 0, screenWidth, MARGIN * 2, BLACK);
   const char *resourcesText =
-      TextFormat("Wood : %i - Stone : %i - Gold : %i", resources.wood,
-                 resources.stone, resources.gold);
-  DrawText(resourcesText, MARGIN, MARGIN, 20, WHITE);
+      TextFormat("Wood : %i - Stone : %i - Gold : %i  -  Press h for actions",
+                 resources.wood, resources.stone, resources.gold);
+  DrawText(resourcesText, MARGIN, MARGIN, GAME_FONT_SIZE, WHITE);
   DrawFPS(screenWidth - MARGIN - MeasureText("120 FPS", GAME_FONT_SIZE),
           MARGIN);
 }
@@ -466,5 +481,11 @@ static void CheckMovement(Camera2D *camera) {
     }
     Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, *camera);
     entity->targetPosition = mousePositionInWorld;
+  }
+}
+
+static void CheckInputs() {
+  if (IsKeyPressed(KEY_H)) {
+    toggleHelp = !toggleHelp;
   }
 }
