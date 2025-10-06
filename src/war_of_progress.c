@@ -1,6 +1,7 @@
 #include "raylib.h"
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
@@ -8,6 +9,8 @@
 #if defined(PLATFORM_WEB)
 #include <emscripten/emscripten.h>
 #endif
+
+#define SHELTER_WOOD_COST = 50;
 
 static void InitTextures(void);
 static void FreeTextures(void);
@@ -19,6 +22,7 @@ static void InitCamera(void);
 static void CheckScroll(Camera2D *);
 static void CheckMouseZoom(Camera2D *);
 static void CheckSelect(Camera2D *);
+static void CheckBuilding(Camera2D *);
 static void CheckMovement(Camera2D *);
 static void CheckInputs();
 static float ToXIso(int, int);
@@ -30,45 +34,65 @@ static void FreeGame(void);
 static void DrawHelpWindow(int, int);
 static void DrawTopHud(void);
 
-enum EntityType {
+typedef enum EntityType {
   // Units
   VILLAGER,
 
   // Buildings
-  CITY_HALL
-};
+  CITY_HALL,
+  SHELTER
+} EntityType;
+
+static bool TryBuild(EntityType, Vector2);
 
 typedef struct GameTexture {
   Texture2D texture;
   int animFramesNumber;
+  EntityType entityType;
 } GameTexture;
 
-struct Entity {
+static float GetGameTextureWidth(GameTexture *gameTexture) {
+  return (float)gameTexture->texture.width / gameTexture->animFramesNumber;
+}
+
+typedef struct Entity {
   Vector2 position;
-  enum EntityType type;
+  EntityType type;
   int hp;
   int animCurrentFrame;
   bool isSelected;
   Vector2 targetPosition;
   bool isControllable;
-};
+} Entity;
 
-struct Entity createCityHallEntity(int x, int y) {
-  return (struct Entity){.position = {x, y},
-                         .type = CITY_HALL,
-                         .hp = 3000,
-                         .animCurrentFrame = 1,
-                         .targetPosition = {x, y},
-                         .isControllable = false};
+Entity createCityHallEntity(Vector2 position) {
+  return (Entity){.position = position,
+                  .type = CITY_HALL,
+                  .hp = 3000,
+                  .animCurrentFrame = 1,
+                  .isSelected = false,
+                  .targetPosition = position,
+                  .isControllable = false};
 }
 
-struct Entity createVillagerEntity(int x, int y) {
-  return (struct Entity){.position = {x, y},
-                         .type = VILLAGER,
-                         .hp = 100,
-                         .animCurrentFrame = 1,
-                         .targetPosition = {x, y},
-                         .isControllable = true};
+Entity createShelterEntity(Vector2 position) {
+  return (Entity){.position = position,
+                  .type = SHELTER,
+                  .hp = 500,
+                  .animCurrentFrame = 1,
+                  .isSelected = false,
+                  .targetPosition = position,
+                  .isControllable = false};
+}
+
+Entity createVillagerEntity(Vector2 position) {
+  return (Entity){.position = position,
+                  .type = VILLAGER,
+                  .hp = 100,
+                  .animCurrentFrame = 1,
+                  .isSelected = false,
+                  .targetPosition = position,
+                  .isControllable = true};
 }
 
 struct Resources {
@@ -91,7 +115,7 @@ static GameTexture primitiveShelterTexture;
 static GameTexture primitiveVillagerTexture;
 static Vector2 mapSize = {200, 200};
 static enum Tile **map = NULL;
-static struct Entity *entities = NULL;
+static Entity *entities = NULL;
 static int entitiesSize = 0;
 static struct Resources resources;
 static bool toggleHelp = false;
@@ -132,6 +156,7 @@ static void UpdateDrawFrame(void) {
     CheckMouseZoom(&camera);
     CheckSelect(&camera);
     CheckMovement(&camera);
+    CheckBuilding(&camera);
     CheckInputs();
     ProcessMovements();
     RenderMainGame();
@@ -154,7 +179,7 @@ static void RenderMenu(void) {
 
 static void ProcessMovements(void) {
   for (int i = 0; i < entitiesSize; i++) {
-    struct Entity *entity = &entities[i];
+    Entity *entity = &entities[i];
     // TODO: calculate next position instead of teleport
     entity->position = entity->targetPosition;
   }
@@ -201,7 +226,7 @@ static void RenderMainGame(void) {
 
   // Draw entities
   for (i = 0; i < entitiesSize; i++) {
-    struct Entity *entity = &entities[i];
+    Entity *entity = &entities[i];
     GameTexture texture = EntityToTexture(entity->type);
     int x = entity->position.x;
     int y = entity->position.y;
@@ -222,7 +247,7 @@ static void RenderMainGame(void) {
   }
 
   // May draw texture at cursor position for builds
-  if (atCursorTexture != NULL) {
+  if (atCursorTexture) {
     Vector2 screenMousePosition = GetMousePosition();
     Vector2 mousePosition = GetScreenToWorld2D(screenMousePosition, camera);
     float textureWidth = (float)atCursorTexture->texture.width /
@@ -264,12 +289,31 @@ static void DrawTopHud(void) {
           MARGIN);
 }
 
+// ENTITIES HELPERS
+
+static Entity CreateEntity(EntityType entityType, Vector2 position) {
+  switch (entityType) {
+  case VILLAGER:
+    return createVillagerEntity(position);
+    break;
+  case CITY_HALL:
+    return createCityHallEntity(position);
+    break;
+  case SHELTER:
+    return createShelterEntity(position);
+    break;
+  }
+}
+
+static void AddToEntities(EntityType entityType, Vector2 position) {
+  entitiesSize += 1;
+  entities = realloc(entities, entitiesSize * sizeof(Entity));
+  entities[entitiesSize - 1] = CreateEntity(entityType, position);
+}
+
 // SELECTED ENTITIES HELPERS
 
-static void AddToSelectedEntities(struct Entity *entity) {
-  printf("Add to selected\n");
-  entity->isSelected = true;
-}
+static void AddToSelectedEntities(Entity *entity) { entity->isSelected = true; }
 
 // INITS
 
@@ -292,15 +336,18 @@ static void InitTextures(void) {
   // Buildings
   primitiveCityHallTexture = (struct GameTexture){
       .texture = LoadTexture("assets/primitive/buildings/cityHall.png"),
-      .animFramesNumber = 7};
+      .animFramesNumber = 7,
+      .entityType = CITY_HALL};
   primitiveShelterTexture = (struct GameTexture){
       .texture = LoadTexture("assets/primitive/buildings/shelter.png"),
-      .animFramesNumber = 7};
+      .animFramesNumber = 7,
+      .entityType = SHELTER};
 
   // Units
   primitiveVillagerTexture = (struct GameTexture){
       .texture = LoadTexture("assets/primitive/units/villager.png"),
-      .animFramesNumber = 1};
+      .animFramesNumber = 1,
+      .entityType = VILLAGER};
 }
 
 static void FreeTextures(void) {
@@ -324,18 +371,18 @@ void InitMap(void) {
 
 void InitEntities(void) {
   entitiesSize = 4;
-  entities = (struct Entity *)malloc(entitiesSize * sizeof(struct Entity));
+  entities = (Entity *)malloc(entitiesSize * sizeof(Entity));
 
   int mapCenterX = camera.target.x;
   int mapCenterY = camera.target.y;
 
   // CITY_HALL
-  entities[0] = createCityHallEntity(mapCenterX, mapCenterY);
+  entities[0] = createCityHallEntity((Vector2){mapCenterX, mapCenterY});
 
   // VILLAGERS
-  entities[1] = createVillagerEntity(mapCenterX - 400, mapCenterY);
-  entities[2] = createVillagerEntity(mapCenterX, mapCenterY - 400);
-  entities[3] = createVillagerEntity(mapCenterX, mapCenterY + 1100);
+  entities[1] = createVillagerEntity((Vector2){mapCenterX - 400, mapCenterY});
+  entities[2] = createVillagerEntity((Vector2){mapCenterX, mapCenterY - 400});
+  entities[3] = createVillagerEntity((Vector2){mapCenterX, mapCenterY + 1100});
 }
 
 void InitResources(void) {
@@ -398,6 +445,9 @@ static GameTexture EntityToTexture(enum EntityType type) { // TODO: support ages
   case VILLAGER:
     return primitiveVillagerTexture;
     break;
+  case SHELTER:
+    return primitiveShelterTexture;
+    break;
   }
 }
 
@@ -435,8 +485,6 @@ static bool IsTopScreenHit(int y) { return y <= MARGIN; }
 
 static bool IsHit(Vector2 testPosition, Vector2 targetPosition,
                   Vector2 targetSize) {
-  printf("\n%f %f %f %f %f %f\n", testPosition.x, testPosition.y,
-         targetPosition.x, targetPosition.y, targetSize.x, targetSize.y);
   return testPosition.x >= targetPosition.x &&
          testPosition.x <= (targetPosition.x + targetSize.x) &&
          testPosition.y >= targetPosition.y &&
@@ -479,24 +527,75 @@ static void CheckMouseZoom(Camera2D *camera) {
 }
 
 static void CheckSelect(Camera2D *camera) {
-  Vector2 mousePosition = GetMousePosition();
   if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
     return;
   FreeSelectedEntities();
+  Vector2 mousePosition = GetMousePosition();
+  Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, *camera);
   for (int i = 0; i < entitiesSize; i++) {
-    struct Entity *entity = &entities[i];
+    Entity *entity = &entities[i];
     GameTexture entityTexture = EntityToTexture(entity->type);
     int entityWidth =
         entityTexture.texture.width / (float)entityTexture.animFramesNumber;
     int entityHeight = entityTexture.texture.height;
     Vector2 entitySize = (Vector2){entityWidth, entityHeight};
-    Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, *camera);
     if (IsHit(mousePositionInWorld, entity->position, entitySize)) {
-      printf("Select checked\n");
       AddToSelectedEntities(entity);
       return;
     }
   }
+}
+
+static void CheckBuilding(Camera2D *camera) {
+  if (atCursorTexture == NULL)
+    return;
+  if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
+    return;
+  Vector2 mousePosition = GetMousePosition();
+  Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, *camera);
+  Vector2 mouseTexturePosition = {
+      .x = mousePositionInWorld.x -
+           (float)GetGameTextureWidth(atCursorTexture) / 2,
+      .y = mousePositionInWorld.y - (float)atCursorTexture->texture.height / 2};
+  Rectangle mouseTextureRectangle = {
+      .x = mouseTexturePosition.x,
+      .y = mouseTexturePosition.y,
+      .width = (float)GetGameTextureWidth(atCursorTexture),
+      .height = atCursorTexture->texture.height};
+  for (int i = 0; i < entitiesSize; i++) {
+    Entity *entity = &entities[i];
+    GameTexture entityTexture = EntityToTexture(entity->type);
+    Rectangle entityTextureRectangle = {.x = entity->position.x,
+                                        .y = entity->position.y,
+                                        .width =
+                                            GetGameTextureWidth(&entityTexture),
+                                        .height = entityTexture.texture.height};
+    if (CheckCollisionRecs(mouseTextureRectangle, entityTextureRectangle)) {
+      return;
+    }
+  }
+  if (TryBuild(atCursorTexture->entityType, mouseTexturePosition)) {
+    atCursorTexture = NULL;
+  }
+}
+
+static bool TryBuild(EntityType entityType, Vector2 position) {
+  switch (entityType) {
+  case VILLAGER:
+    // TODO
+    break;
+  case CITY_HALL:
+    // TODO
+    break;
+  case SHELTER:
+    if (resources.wood >= 50) {
+      resources.wood -= 50;
+      AddToEntities(entityType, position);
+      return true;
+    }
+    break;
+  }
+  return false;
 }
 
 static void CheckMovement(Camera2D *camera) {
@@ -504,7 +603,7 @@ static void CheckMovement(Camera2D *camera) {
   if (!IsMouseButtonPressed(MOUSE_BUTTON_RIGHT))
     return;
   for (int i = 0; i < entitiesSize; i++) {
-    struct Entity *entity = &entities[i];
+    Entity *entity = &entities[i];
     if (!entity->isControllable || !entity->isSelected) {
       continue;
     }
