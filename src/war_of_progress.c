@@ -63,7 +63,10 @@ typedef struct Entity {
   bool isSelected;
   Vector2 targetPosition;
   bool isControllable;
+  int moveSpeed;
 } Entity;
+
+static bool CanMove(Vector2, Entity *);
 
 Entity createCityHallEntity(Vector2 position) {
   return (Entity){.position = position,
@@ -92,7 +95,8 @@ Entity createVillagerEntity(Vector2 position) {
                   .animCurrentFrame = 1,
                   .isSelected = false,
                   .targetPosition = position,
-                  .isControllable = true};
+                  .isControllable = true,
+                  .moveSpeed = 5};
 }
 
 struct Resources {
@@ -180,9 +184,63 @@ static void RenderMenu(void) {
 static void ProcessMovements(void) {
   for (int i = 0; i < entitiesSize; i++) {
     Entity *entity = &entities[i];
-    // TODO: calculate next position instead of teleport
-    entity->position = entity->targetPosition;
+    int deltaMovement = GetFrameTime() * GetFPS() * entity->moveSpeed;
+    if (entity->position.x < entity->targetPosition.x) {
+      if (CanMove(
+              (Vector2){entity->position.x + deltaMovement, entity->position.y},
+              entity)) {
+        entity->position.x += deltaMovement;
+        if (entity->position.x > entity->targetPosition.x) {
+          entity->position.x = entity->targetPosition.x;
+        }
+      }
+    } else if (entity->position.x > entity->targetPosition.x) {
+      if (CanMove(
+              (Vector2){entity->position.x - deltaMovement, entity->position.y},
+              entity)) {
+        entity->position.x -= deltaMovement;
+        if (entity->position.x < entity->targetPosition.x) {
+          entity->position.x = entity->targetPosition.x;
+        }
+      }
+    }
+    if (entity->position.y < entity->targetPosition.y) {
+      if (CanMove(
+              (Vector2){entity->position.x, entity->position.y + deltaMovement},
+              entity)) {
+        entity->position.y += deltaMovement;
+        if (entity->position.y > entity->targetPosition.y) {
+          entity->position.y = entity->targetPosition.y;
+        }
+      }
+    } else if (entity->position.y > entity->targetPosition.y) {
+      if (CanMove(
+              (Vector2){entity->position.x, entity->position.y - deltaMovement},
+              entity)) {
+        entity->position.y -= deltaMovement;
+        if (entity->position.y < entity->targetPosition.y) {
+          entity->position.y = entity->targetPosition.y;
+        }
+      }
+    }
   }
+}
+
+static bool CanMove(Vector2 nextPosition, Entity *currentEntity) {
+  for (int i = 0; i < entitiesSize; i++) {
+    Entity *entity = &entities[i];
+    if (currentEntity == entity)
+      continue;
+    GameTexture texture = EntityToTexture(entity->type);
+    Rectangle hitbox = {.x = entity->position.x,
+                        .y = entity->position.y,
+                        .width = GetGameTextureWidth(&texture),
+                        .height = texture.texture.height};
+    if (CheckCollisionPointRec(nextPosition, hitbox)) {
+      return false;
+    }
+  }
+  return true;
 }
 
 const Color BACKGROUND = BLACK;
@@ -437,6 +495,8 @@ static GameTexture TileToTexture(enum Tile tile) {
   }
 }
 
+// Needed and avoid pointers to textures from entities to ease resolution of
+// textures depending on the current age of the player
 static GameTexture EntityToTexture(enum EntityType type) { // TODO: support ages
   switch (type) {
   case CITY_HALL:
@@ -527,6 +587,8 @@ static void CheckMouseZoom(Camera2D *camera) {
 }
 
 static void CheckSelect(Camera2D *camera) {
+  if (atCursorTexture != NULL)
+    return;
   if (!IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
     return;
   FreeSelectedEntities();
