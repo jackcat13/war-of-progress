@@ -10,7 +10,8 @@
 #include <emscripten/emscripten.h>
 #endif
 
-#define SHELTER_WOOD_COST = 50;
+const int BASE_POPULATION_MAX = 5;
+const int SHELTER_POPULATION_NUMBER = 5;
 
 static void InitTextures(void);
 static void FreeTextures(void);
@@ -33,6 +34,8 @@ static void InitGame(void);
 static void FreeGame(void);
 static void DrawHelpWindow(int, int);
 static void DrawTopHud(void);
+static int GetPopulation(void);
+static int GetMaxPopulation(void);
 
 typedef enum EntityType {
   // Units
@@ -126,6 +129,24 @@ static bool toggleHelp = false;
 static GameTexture *atCursorTexture = NULL;
 
 const int GAME_FONT_SIZE = 20;
+
+static int GetPopulation(){
+  int population = 0;
+  for (int i = 0; i < entitiesSize; i++) {
+    Entity *entity = &entities[i];
+    if (entity->isControllable) population++;
+  }
+  return population;
+}
+
+static int GetMaxPopulation(){
+  int maxPopulation = BASE_POPULATION_MAX;
+  for (int i = 0; i < entitiesSize; i++) {
+    Entity *entity = &entities[i];
+    if (entity->type == SHELTER) maxPopulation+=SHELTER_POPULATION_NUMBER;
+  }
+  return maxPopulation;
+}
 
 int main() {
   SetConfigFlags(FLAG_WINDOW_HIGHDPI);
@@ -340,8 +361,8 @@ static void DrawTopHud(void) {
   int screenWidth = GetScreenWidth();
   DrawRectangle(0, 0, screenWidth, MARGIN * 2, BLACK);
   const char *resourcesText =
-      TextFormat("Wood : %i - Stone : %i - Gold : %i  -  Press h for actions",
-                 resources.wood, resources.stone, resources.gold);
+      TextFormat("Wood : %i - Stone : %i - Gold : %i - Population : %i/%i -  Press h for actions",
+                 resources.wood, resources.stone, resources.gold, GetPopulation(), GetMaxPopulation());
   DrawText(resourcesText, MARGIN, MARGIN, GAME_FONT_SIZE, WHITE);
   DrawFPS(screenWidth - MARGIN - MeasureText("120 FPS", GAME_FONT_SIZE),
           MARGIN);
