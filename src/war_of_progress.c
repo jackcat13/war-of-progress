@@ -106,6 +106,7 @@ struct Resources {
   int wood;
   int stone;
   int gold;
+  int food;
 };
 
 enum Scene { MENU, MAIN_GAME };
@@ -115,20 +116,21 @@ enum Tile { GRASS };
 static GameTexture TileToTexture(enum Tile);
 static GameTexture EntityToTexture(enum EntityType);
 
+#define MAP_WIDTH 200
+#define GAME_FONT_SIZE 20
+
 static Camera2D camera = {0};
 static GameTexture grassTexture;
 static GameTexture primitiveCityHallTexture;
 static GameTexture primitiveShelterTexture;
 static GameTexture primitiveVillagerTexture;
-static Vector2 mapSize = {200, 200};
+static Vector2 mapSize = {MAP_WIDTH, MAP_WIDTH};
 static enum Tile **map = NULL;
 static Entity *entities = NULL;
 static int entitiesSize = 0;
 static struct Resources resources;
 static bool toggleHelp = false;
 static GameTexture *atCursorTexture = NULL;
-
-const int GAME_FONT_SIZE = 20;
 
 static int GetPopulation(){
   int population = 0;
@@ -361,8 +363,8 @@ static void DrawTopHud(void) {
   int screenWidth = GetScreenWidth();
   DrawRectangle(0, 0, screenWidth, MARGIN * 2, BLACK);
   const char *resourcesText =
-      TextFormat("Wood : %i - Stone : %i - Gold : %i - Population : %i/%i -  Press h for actions",
-                 resources.wood, resources.stone, resources.gold, GetPopulation(), GetMaxPopulation());
+      TextFormat("Wood : %i - Stone : %i - Gold : %i, Food : %i - Population : %i/%i -  Press h for actions",
+                 resources.wood, resources.stone, resources.gold, resources.food, GetPopulation(), GetMaxPopulation());
   DrawText(resourcesText, MARGIN, MARGIN, GAME_FONT_SIZE, WHITE);
   DrawFPS(screenWidth - MARGIN - MeasureText("120 FPS", GAME_FONT_SIZE),
           MARGIN);
@@ -462,12 +464,15 @@ void InitEntities(void) {
   entities[1] = createVillagerEntity((Vector2){mapCenterX - 400, mapCenterY});
   entities[2] = createVillagerEntity((Vector2){mapCenterX, mapCenterY - 400});
   entities[3] = createVillagerEntity((Vector2){mapCenterX, mapCenterY + 1100});
+
+  //TODO: generate resources providers using perlin noise
 }
 
 void InitResources(void) {
   resources.wood = 50;
   resources.stone = 50;
   resources.gold = 0;
+  resources.food = 0;
 }
 
 static void InitGame(void) {
