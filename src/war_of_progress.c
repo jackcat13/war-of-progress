@@ -15,7 +15,7 @@ const int SHELTER_POPULATION_NUMBER = 5;
 
 static void InitTextures(void);
 static void FreeTextures(void);
-static void UpdateDrawFrame(void);
+static void UpdateDrawFrame(RenderTexture2D);
 static void RenderMenu(void);
 static void ProcessMovements(void);
 static void RenderMainGame(void);
@@ -132,20 +132,22 @@ static struct Resources resources;
 static bool toggleHelp = false;
 static GameTexture *atCursorTexture = NULL;
 
-static int GetPopulation(){
+static int GetPopulation() {
   int population = 0;
   for (int i = 0; i < entitiesSize; i++) {
     Entity *entity = &entities[i];
-    if (entity->isControllable) population++;
+    if (entity->isControllable)
+      population++;
   }
   return population;
 }
 
-static int GetMaxPopulation(){
+static int GetMaxPopulation() {
   int maxPopulation = BASE_POPULATION_MAX;
   for (int i = 0; i < entitiesSize; i++) {
     Entity *entity = &entities[i];
-    if (entity->type == SHELTER) maxPopulation+=SHELTER_POPULATION_NUMBER;
+    if (entity->type == SHELTER)
+      maxPopulation += SHELTER_POPULATION_NUMBER;
   }
   return maxPopulation;
 }
@@ -156,13 +158,16 @@ int main() {
   GuiLoadStyleDefault();
   InitTextures();
 
+  RenderTexture2D target =
+      LoadRenderTexture(GetScreenWidth(), GetScreenHeight());
+
 #if defined(PLATFORM_WEB)
   emscripten_set_main_loop(UpdateDrawFrame, 60, 1);
 #else
   SetTargetFPS(60);
 
   while (!WindowShouldClose()) {
-    UpdateDrawFrame();
+    UpdateDrawFrame(target);
   }
 #endif
   FreeGame();
@@ -171,8 +176,8 @@ int main() {
   return 0;
 }
 
-static void UpdateDrawFrame(void) {
-  BeginDrawing();
+static void UpdateDrawFrame(RenderTexture2D target) {
+  BeginTextureMode(target);
 
   switch (current_scene) {
   case MENU:
@@ -190,6 +195,13 @@ static void UpdateDrawFrame(void) {
     break;
   }
 
+  EndTextureMode();
+
+  BeginDrawing();
+  DrawTextureRec(target.texture,
+                 (Rectangle){0, 0, (float)target.texture.width,
+                             (float)-target.texture.height},
+                 (Vector2){0, 0}, WHITE);
   EndDrawing();
 }
 
@@ -363,8 +375,10 @@ static void DrawTopHud(void) {
   int screenWidth = GetScreenWidth();
   DrawRectangle(0, 0, screenWidth, MARGIN * 2, BLACK);
   const char *resourcesText =
-      TextFormat("Wood : %i - Stone : %i - Gold : %i, Food : %i - Population : %i/%i -  Press h for actions",
-                 resources.wood, resources.stone, resources.gold, resources.food, GetPopulation(), GetMaxPopulation());
+      TextFormat("Wood : %i - Stone : %i - Gold : %i, Food : %i - Population : "
+                 "%i/%i -  Press h for actions",
+                 resources.wood, resources.stone, resources.gold,
+                 resources.food, GetPopulation(), GetMaxPopulation());
   DrawText(resourcesText, MARGIN, MARGIN, GAME_FONT_SIZE, WHITE);
   DrawFPS(screenWidth - MARGIN - MeasureText("120 FPS", GAME_FONT_SIZE),
           MARGIN);
@@ -465,7 +479,7 @@ void InitEntities(void) {
   entities[2] = createVillagerEntity((Vector2){mapCenterX, mapCenterY - 400});
   entities[3] = createVillagerEntity((Vector2){mapCenterX, mapCenterY + 1100});
 
-  //TODO: generate resources providers using perlin noise
+  // TODO: generate resources providers using perlin noise
 }
 
 void InitResources(void) {
