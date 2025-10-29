@@ -1,7 +1,8 @@
+#include "perlin.h"
 #include "raylib.h"
 #include <stdbool.h>
-#include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define RAYGUI_IMPLEMENTATION
 #include "raygui.h"
@@ -43,7 +44,10 @@ typedef enum EntityType {
 
   // Buildings
   CITY_HALL,
-  SHELTER
+  SHELTER,
+
+  // Resources
+  TREE
 } EntityType;
 
 static bool TryBuild(EntityType, Vector2);
@@ -75,6 +79,16 @@ Entity createCityHallEntity(Vector2 position) {
   return (Entity){.position = position,
                   .type = CITY_HALL,
                   .hp = 3000,
+                  .animCurrentFrame = 1,
+                  .isSelected = false,
+                  .targetPosition = position,
+                  .isControllable = false};
+}
+
+Entity createTreeEntity(Vector2 position) {
+  return (Entity){.position = position,
+                  .type = TREE,
+                  .hp = 400,
                   .animCurrentFrame = 1,
                   .isSelected = false,
                   .targetPosition = position,
@@ -124,6 +138,7 @@ static GameTexture grassTexture;
 static GameTexture primitiveCityHallTexture;
 static GameTexture primitiveShelterTexture;
 static GameTexture primitiveVillagerTexture;
+static GameTexture treeTexture;
 static Vector2 mapSize = {MAP_WIDTH, MAP_WIDTH};
 static enum Tile **map = NULL;
 static Entity *entities = NULL;
@@ -397,6 +412,9 @@ static Entity CreateEntity(EntityType entityType, Vector2 position) {
   case SHELTER:
     return createShelterEntity(position);
     break;
+  case TREE:
+    return createTreeEntity(position);
+    break;
   }
 }
 
@@ -425,24 +443,30 @@ static void InitCamera(void) {
 
 static void InitTextures(void) {
   // MAP TILES
-  grassTexture = (struct GameTexture){
-      .texture = LoadTexture("assets/map/grass.png"), .animFramesNumber = 1};
+  grassTexture = (GameTexture){.texture = LoadTexture("assets/map/grass.png"),
+                               .animFramesNumber = 1};
 
   // Buildings
-  primitiveCityHallTexture = (struct GameTexture){
+  primitiveCityHallTexture = (GameTexture){
       .texture = LoadTexture("assets/primitive/buildings/cityHall.png"),
       .animFramesNumber = 7,
       .entityType = CITY_HALL};
-  primitiveShelterTexture = (struct GameTexture){
+  primitiveShelterTexture = (GameTexture){
       .texture = LoadTexture("assets/primitive/buildings/shelter.png"),
       .animFramesNumber = 7,
       .entityType = SHELTER};
 
   // Units
-  primitiveVillagerTexture = (struct GameTexture){
+  primitiveVillagerTexture = (GameTexture){
       .texture = LoadTexture("assets/primitive/units/villager.png"),
       .animFramesNumber = 1,
       .entityType = VILLAGER};
+
+  // Resources
+  treeTexture =
+      (GameTexture){.texture = LoadTexture("assets/resources/tree.png"),
+                    .animFramesNumber = 1,
+                    .entityType = TREE};
 }
 
 static void FreeTextures(void) {
@@ -479,7 +503,23 @@ void InitEntities(void) {
   entities[2] = createVillagerEntity((Vector2){mapCenterX, mapCenterY - 400});
   entities[3] = createVillagerEntity((Vector2){mapCenterX, mapCenterY + 1100});
 
-  // TODO: generate resources providers using perlin noise
+  const int MAP_CENTER_AREA = 1500;
+  int seed = (int)time(NULL);
+  perlin_init(seed);
+  for (int j = 0; j < mapSize.y; j++) {
+    for (int i = 0; i < mapSize.x; i++) {
+      double perlinNoiseValue = perlin2D_octaves(i * 0.1f, j * 0.1f, 4, 0.5f);
+      if (perlinNoiseValue > 0.25) {
+        Vector2 position = {ToXIso(i, j), ToYIso(i, j)};
+        if (position.x >= mapCenterX - MAP_CENTER_AREA &&
+            position.x <= mapCenterX + MAP_CENTER_AREA &&
+            position.y >= mapCenterY - MAP_CENTER_AREA &&
+            position.y <= mapCenterY + MAP_CENTER_AREA)
+          continue;
+        AddToEntities(TREE, position);
+      }
+    }
+  }
 }
 
 void InitResources(void) {
@@ -547,6 +587,9 @@ static GameTexture EntityToTexture(enum EntityType type) { // TODO: support ages
     break;
   case SHELTER:
     return primitiveShelterTexture;
+    break;
+  case TREE:
+    return treeTexture;
     break;
   }
 }
@@ -642,6 +685,8 @@ static void CheckSelect(Camera2D *camera) {
     int entityHeight = entityTexture.texture.height;
     Vector2 entitySize = (Vector2){entityWidth, entityHeight};
     if (IsHit(mousePositionInWorld, entity->position, entitySize)) {
+      if (entity->isControllable == false)
+        continue;
       AddToSelectedEntities(entity);
       return;
     }
@@ -695,6 +740,8 @@ static bool TryBuild(EntityType entityType, Vector2 position) {
       AddToEntities(entityType, position);
       return true;
     }
+    break;
+  case TREE:
     break;
   }
   return false;
