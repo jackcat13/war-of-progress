@@ -64,6 +64,7 @@ static float GetGameTextureWidth(GameTexture *gameTexture) {
 
 typedef struct Entity {
   Vector2 position;
+  Rectangle relativeHitbox;
   EntityType type;
   int hp;
   int animCurrentFrame;
@@ -73,10 +74,12 @@ typedef struct Entity {
   int moveSpeed;
 } Entity;
 
+static Rectangle GetEntityHitbox(Entity *entity);
 static bool CanMove(Vector2, Entity *);
 
 Entity createCityHallEntity(Vector2 position) {
   return (Entity){.position = position,
+                  .relativeHitbox = {103.0, 212.0, 655.0, 480.0},
                   .type = CITY_HALL,
                   .hp = 3000,
                   .animCurrentFrame = 1,
@@ -87,6 +90,7 @@ Entity createCityHallEntity(Vector2 position) {
 
 Entity createTreeEntity(Vector2 position) {
   return (Entity){.position = position,
+                  .relativeHitbox = {213.0, 44.0, 80.0, 400.0},
                   .type = TREE,
                   .hp = 400,
                   .animCurrentFrame = 1,
@@ -97,6 +101,7 @@ Entity createTreeEntity(Vector2 position) {
 
 Entity createShelterEntity(Vector2 position) {
   return (Entity){.position = position,
+                  .relativeHitbox = {103.0, 212.0, 655.0, 480.0},
                   .type = SHELTER,
                   .hp = 500,
                   .animCurrentFrame = 1,
@@ -107,6 +112,7 @@ Entity createShelterEntity(Vector2 position) {
 
 Entity createVillagerEntity(Vector2 position) {
   return (Entity){.position = position,
+                  .relativeHitbox = {53.0, 9.0, 20.0, 112.0},
                   .type = VILLAGER,
                   .hp = 100,
                   .animCurrentFrame = 1,
@@ -146,6 +152,7 @@ static int entitiesSize = 0;
 static struct Resources resources;
 static bool toggleHelp = false;
 static GameTexture *atCursorTexture = NULL;
+static bool toggleHitboxes = false;
 
 static int GetPopulation() {
   int population = 0;
@@ -234,20 +241,20 @@ static void RenderMenu(void) {
 static void ProcessMovements(void) {
   for (int i = 0; i < entitiesSize; i++) {
     Entity *entity = &entities[i];
+    Rectangle entityHitbox = GetEntityHitbox(entity);
     int deltaMovement = GetFrameTime() * GetFPS() * entity->moveSpeed;
     if (entity->position.x < entity->targetPosition.x) {
-      if (CanMove(
-              (Vector2){entity->position.x + deltaMovement, entity->position.y},
-              entity)) {
+      if (CanMove((Vector2){entityHitbox.x + entityHitbox.width + deltaMovement,
+                            entityHitbox.y},
+                  entity)) {
         entity->position.x += deltaMovement;
         if (entity->position.x > entity->targetPosition.x) {
           entity->position.x = entity->targetPosition.x;
         }
       }
     } else if (entity->position.x > entity->targetPosition.x) {
-      if (CanMove(
-              (Vector2){entity->position.x - deltaMovement, entity->position.y},
-              entity)) {
+      if (CanMove((Vector2){entityHitbox.x - deltaMovement, entityHitbox.y},
+                  entity)) {
         entity->position.x -= deltaMovement;
         if (entity->position.x < entity->targetPosition.x) {
           entity->position.x = entity->targetPosition.x;
@@ -256,7 +263,8 @@ static void ProcessMovements(void) {
     }
     if (entity->position.y < entity->targetPosition.y) {
       if (CanMove(
-              (Vector2){entity->position.x, entity->position.y + deltaMovement},
+              (Vector2){entityHitbox.x,
+                        entityHitbox.y + entityHitbox.height + deltaMovement},
               entity)) {
         entity->position.y += deltaMovement;
         if (entity->position.y > entity->targetPosition.y) {
@@ -264,9 +272,8 @@ static void ProcessMovements(void) {
         }
       }
     } else if (entity->position.y > entity->targetPosition.y) {
-      if (CanMove(
-              (Vector2){entity->position.x, entity->position.y - deltaMovement},
-              entity)) {
+      if (CanMove((Vector2){entityHitbox.x, entityHitbox.y - deltaMovement},
+                  entity)) {
         entity->position.y -= deltaMovement;
         if (entity->position.y < entity->targetPosition.y) {
           entity->position.y = entity->targetPosition.y;
@@ -282,15 +289,19 @@ static bool CanMove(Vector2 nextPosition, Entity *currentEntity) {
     if (currentEntity == entity)
       continue;
     GameTexture texture = EntityToTexture(entity->type);
-    Rectangle hitbox = {.x = entity->position.x,
-                        .y = entity->position.y,
-                        .width = GetGameTextureWidth(&texture),
-                        .height = texture.texture.height};
+    Rectangle hitbox = GetEntityHitbox(entity);
     if (CheckCollisionPointRec(nextPosition, hitbox)) {
       return false;
     }
   }
   return true;
+}
+
+static Rectangle GetEntityHitbox(Entity *entity) {
+  return (Rectangle){.x = entity->position.x + entity->relativeHitbox.x,
+                     .y = entity->position.y + entity->relativeHitbox.y,
+                     .width = entity->relativeHitbox.width,
+                     .height = entity->relativeHitbox.height};
 }
 
 const Color BACKGROUND = BLACK;
@@ -348,6 +359,10 @@ static void RenderMainGame(void) {
         texture.texture,
         (Rectangle){animOffset, 0, animWidth, texture.texture.height},
         (Vector2){x, y}, textureColor);
+    if (toggleHitboxes) {
+      Rectangle entityHitbox = GetEntityHitbox(entity);
+      DrawRectangleRec(entityHitbox, BLACK);
+    }
     entity->animCurrentFrame++;
     if (entity->animCurrentFrame > texture.animFramesNumber) {
       entity->animCurrentFrame = 1;
@@ -381,7 +396,8 @@ static void DrawHelpWindow(int screenWidth, int screenHeight) {
   DrawRectangle(screenWidth / 4, screenHeight / 4, screenWidth / 2,
                 screenHeight / 2, BLACK);
   const char *helpText =
-      "ACTION KEYS\nS - Build a shelter (+5 pop). Cost:  50 wood.";
+      "ACTION KEYS\nENTER - Show hitboxes\nS - Build a shelter "
+      "(+5 pop). Cost:  50 wood.";
   DrawText(helpText, screenWidth / 4 + MARGIN, screenHeight / 4 + MARGIN,
            GAME_FONT_SIZE, WHITE);
 }
@@ -626,14 +642,6 @@ static bool IsBottomScreenHit(int y) { return y >= GetScreenHeight() - MARGIN; }
 
 static bool IsTopScreenHit(int y) { return y <= MARGIN; }
 
-static bool IsHit(Vector2 testPosition, Vector2 targetPosition,
-                  Vector2 targetSize) {
-  return testPosition.x >= targetPosition.x &&
-         testPosition.x <= (targetPosition.x + targetSize.x) &&
-         testPosition.y >= targetPosition.y &&
-         testPosition.y <= (targetPosition.y + targetSize.y);
-}
-
 // Mouse or Keyboard interactions
 
 const int SCROLL_MOVE = 80;
@@ -679,14 +687,15 @@ static void CheckSelect(Camera2D *camera) {
   Vector2 mousePositionInWorld = GetScreenToWorld2D(mousePosition, *camera);
   for (int i = 0; i < entitiesSize; i++) {
     Entity *entity = &entities[i];
+    if (entity->isControllable == false)
+      continue;
     GameTexture entityTexture = EntityToTexture(entity->type);
     int entityWidth =
         entityTexture.texture.width / (float)entityTexture.animFramesNumber;
     int entityHeight = entityTexture.texture.height;
     Vector2 entitySize = (Vector2){entityWidth, entityHeight};
-    if (IsHit(mousePositionInWorld, entity->position, entitySize)) {
-      if (entity->isControllable == false)
-        continue;
+    Rectangle entityHitbox = GetEntityHitbox(entity);
+    if (CheckCollisionPointRec(mousePositionInWorld, entityHitbox)) {
       AddToSelectedEntities(entity);
       return;
     }
@@ -712,12 +721,8 @@ static void CheckBuilding(Camera2D *camera) {
   for (int i = 0; i < entitiesSize; i++) {
     Entity *entity = &entities[i];
     GameTexture entityTexture = EntityToTexture(entity->type);
-    Rectangle entityTextureRectangle = {.x = entity->position.x,
-                                        .y = entity->position.y,
-                                        .width =
-                                            GetGameTextureWidth(&entityTexture),
-                                        .height = entityTexture.texture.height};
-    if (CheckCollisionRecs(mouseTextureRectangle, entityTextureRectangle)) {
+    Rectangle entityHitbox = GetEntityHitbox(entity);
+    if (CheckCollisionRecs(mouseTextureRectangle, entityHitbox)) {
       return;
     }
   }
@@ -767,5 +772,8 @@ static void CheckInputs() {
   }
   if (IsKeyPressed(KEY_S)) {
     atCursorTexture = &primitiveShelterTexture;
+  }
+  if (IsKeyPressed(KEY_ENTER)) {
+    toggleHitboxes = !toggleHitboxes;
   }
 }
