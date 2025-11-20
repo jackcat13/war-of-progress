@@ -101,7 +101,7 @@ Entity createTreeEntity(Vector2 position) {
 
 Entity createShelterEntity(Vector2 position) {
   return (Entity){.position = position,
-                  .relativeHitbox = {103.0, 212.0, 655.0, 480.0},
+                  .relativeHitbox = {100.0, 230.0, 430.0, 226.0},
                   .type = SHELTER,
                   .hp = 500,
                   .animCurrentFrame = 1,
@@ -469,7 +469,7 @@ static void InitTextures(void) {
       .entityType = CITY_HALL};
   primitiveShelterTexture = (GameTexture){
       .texture = LoadTexture("assets/primitive/buildings/shelter.png"),
-      .animFramesNumber = 7,
+      .animFramesNumber = 1,
       .entityType = SHELTER};
 
   // Units
