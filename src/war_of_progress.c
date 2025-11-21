@@ -149,6 +149,7 @@ static Vector2 mapSize = {MAP_WIDTH, MAP_WIDTH};
 static enum Tile **map = NULL;
 static Entity *entities = NULL;
 static int entitiesSize = 0;
+static int entitiesCapacity = 20;
 static struct Resources resources;
 static bool toggleHelp = false;
 static GameTexture *atCursorTexture = NULL;
@@ -436,7 +437,10 @@ static Entity CreateEntity(EntityType entityType, Vector2 position) {
 
 static void AddToEntities(EntityType entityType, Vector2 position) {
   entitiesSize += 1;
-  entities = realloc(entities, entitiesSize * sizeof(Entity));
+  if (entitiesSize >= entitiesCapacity) {
+    entitiesCapacity *= 2;
+    entities = realloc(entities, entitiesCapacity * sizeof(Entity));
+  }
   entities[entitiesSize - 1] = CreateEntity(entityType, position);
 }
 
@@ -505,19 +509,19 @@ void InitMap(void) {
 }
 
 void InitEntities(void) {
-  entitiesSize = 4;
-  entities = (Entity *)malloc(entitiesSize * sizeof(Entity));
+  entitiesSize = 0;
+  entities = (Entity *)malloc(entitiesCapacity * sizeof(Entity));
 
   int mapCenterX = camera.target.x;
   int mapCenterY = camera.target.y;
 
   // CITY_HALL
-  entities[0] = createCityHallEntity((Vector2){mapCenterX, mapCenterY});
+  AddToEntities(CITY_HALL, (Vector2){mapCenterX, mapCenterY});
 
   // VILLAGERS
-  entities[1] = createVillagerEntity((Vector2){mapCenterX - 400, mapCenterY});
-  entities[2] = createVillagerEntity((Vector2){mapCenterX, mapCenterY - 400});
-  entities[3] = createVillagerEntity((Vector2){mapCenterX, mapCenterY + 1100});
+  AddToEntities(VILLAGER, (Vector2){mapCenterX - 400, mapCenterY});
+  AddToEntities(VILLAGER, (Vector2){mapCenterX, mapCenterY - 400});
+  AddToEntities(VILLAGER, (Vector2){mapCenterX, mapCenterY + 1100});
 
   const int MAP_CENTER_AREA = 1500;
   int seed = (int)time(NULL);
